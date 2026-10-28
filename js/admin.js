@@ -302,7 +302,17 @@
   var SRX = { '블로그': /블로그/g, '유튜브': /유튜브/g, '소개': /소개/g, '타타타': /타타타/g, 'BK오더방': /BK\s*오더방|오더방/g, '이실장': /이실장/g, '오우달': /오우달/g, '새달사': /새달사\s*쪽지|새달사/g, '현근 영업': /현근\s*영업|현근/g, '지인': /지인/g };
   function stripSrc(t, src) { var x = String(t || ''); if (src && SRX[src]) x = x.replace(SRX[src], ' '); x = x.replace(/\(\s*\)/g, ' ').replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim(); var m = /^\((.*)\)$/.exec(x); if (m) x = m[1].trim(); x = x.replace(/^[\s,·\/\-:]+|[\s,·\/\-:]+$/g, '').trim(); return x; }
   function detectSrc(t) { t = String(t || ''); var order = [['블로그', '블로그'], ['유튜브', '유튜브'], ['소개', '소개'], ['타타타', '타타타'], ['오더방', 'BK오더방'], ['이실장', '이실장'], ['오우달', '오우달'], ['새달사', '새달사'], ['현근', '현근 영업'], ['지인', '지인']]; for (var i = 0; i < order.length; i++) if (t.indexOf(order[i][0]) >= 0) return order[i][1]; return null; }
-  var DW = { joined_at: 5.5, status: 4.8, emp_no: 4, team: 4.8, name: 5, ssn: 8.5, phone: 8.5, ins_company: 5.5, insurance: 6.2, deposit_group: 10, callmaner_cost: 6.3, daily_fee: 5.5, insurance_cost: 6, chang_fee: 5, total_cost: 6.5, margin: 5.5, source: 6, note: 5 };
+  var DW = { joined_at: 6.8, status: 4.8, emp_no: 4, team: 4.8, name: 5, ssn: 8.5, phone: 8.5, ins_company: 5.5, insurance: 6.2, deposit_group: 9.2, callmaner_cost: 6.3, daily_fee: 5.5, insurance_cost: 6, chang_fee: 5, total_cost: 6.5, margin: 5.5, source: 6, note: 5 };
+  var dsort = { k: null, dir: 1 };
+  function dcmp(a, b) {
+    var k = dsort.k;
+    if (!k) { var da = a.joined_at || '', db = b.joined_at || ''; if (da !== db) return !da ? -1 : !db ? 1 : (da < db ? -1 : 1); return a.emp_no - b.emp_no; }
+    var x = a[k], y = b[k], ex = x == null || x === '', ey = y == null || y === '';
+    if (ex !== ey) return ex ? 1 : -1;
+    if (ex && ey) return a.emp_no - b.emp_no;
+    var c = (typeof x === 'number' && typeof y === 'number') ? x - y : String(x).localeCompare(String(y), 'ko');
+    return c ? c * dsort.dir : a.emp_no - b.emp_no;
+  }
   var dfil = {}, dfoc = null, STS = ['가입', '퇴사', '미납'];
   var dsel = {};
   var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 보험회사명: 'ins_company', 보험회사: 'ins_company',
@@ -312,15 +322,15 @@
   function viewDrivers(v) {
     var rows = drivers.filter(function (d) { var t = (d.name + d.phone + d.emp_no + (d.team || '') + (d.deposit_group || '') + (d.ins_company || '')).toLowerCase(); return !dq || t.indexOf(dq.toLowerCase()) >= 0; })
       .filter(function (d) { return DCOL.every(function (c) { var f = dfil[c[0]]; if (!f) return true; var s = c[0] === 'ssn' ? fmtSsn(d.ssn) : String(dval(d, c)); if (c[2] === 'n') { var fv = f.replace(/[^0-9\-]/g, ''); return fv === '' || String(d[c[0]] == null ? '' : d[c[0]]) === String(parseInt(fv, 10)); } return c[0] === 'status' ? s === f : s.toLowerCase().indexOf(f.toLowerCase()) >= 0; }); })
-      .sort(function (a, b) { return a.emp_no - b.emp_no; });
+      .sort(dcmp);
     var sum = function (k) { return rows.reduce(function (s, d) { return s + (d[k] || 0); }, 0); };
     var dfN = Object.keys(dfil).filter(function (k) { return dfil[k]; }).length, DWT = 3 + DCOL.reduce(function (s, c) { return s + DW[c[0]]; }, 0);
     var cntS = function (x) { return drivers.filter(function (d) { return (d.status || '가입') === x; }).length; };
     var selN = rows.filter(function (d) { return dsel[d.id]; }).length, allOn = rows.length > 0 && selN === rows.length;
-    v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm" id="dadd">+ 추가</button><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정(전화번호는 누르면 전화, 길게 누르면 수정) </span></div>' +
+    v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm" id="dadd">+ 추가</button><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정(전화번호는 누르면 전화, 길게 누르면 수정) · 제목을 누르면 정렬 </span></div>' +
       '<div class="sumrow"><div class="sc main"><span>순 마진 합계' + (dfN || dq ? ' (필터 결과)' : '') + '</span><b>' + n0(sum('margin')) + '원</b></div><div class="sc"><span>가입</span><b class="g">' + cntS('가입') + '명</b></div><div class="sc"><span>퇴사</span><b>' + cntS('퇴사') + '명</b></div><div class="sc"><span>미납</span><b class="y">' + cntS('미납') + '명</b></div><div class="sc"><span>월 합산 비용 합계</span><b>' + n0(sum('total_cost')) + '원</b></div></div>' +
-      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button>' + (dfN ? '<button class="btn sm line" id="dfclr">필터 해제 (' + dfN + ')</button>' : '') + '</div>' +
-      '<datalist id="srcl">' + SRC.map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist><div class="tw dtw"><table class="dt"><colgroup><col style="width:' + (300 / DWT).toFixed(2) + '%">' + DCOL.map(function (c) { return '<col style="width:' + (DW[c[0]] * 100 / DWT).toFixed(2) + '%">'; }).join('') + '</colgroup><thead><tr><th class="ck"></th>' + DCOL.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr><tr class="fr"><th class="ck"></th>' + DCOL.map(function (c) {
+      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button>' + (dfN ? '<button class="btn sm line" id="dfclr">필터 해제 (' + dfN + ')</button>' : '') + (dsort.k ? '<button class="btn sm line" id="dsclr">정렬 해제 (기본: 가입일순)</button>' : '') + '</div>' +
+      '<datalist id="srcl">' + SRC.map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist><div class="tw dtw"><table class="dt"><colgroup><col style="width:' + (300 / DWT).toFixed(2) + '%">' + DCOL.map(function (c) { return '<col style="width:' + (DW[c[0]] * 100 / DWT).toFixed(2) + '%">'; }).join('') + '</colgroup><thead><tr><th class="ck"></th>' + DCOL.map(function (c) { var on = dsort.k === c[0]; return '<th class="sk" data-sk="' + c[0] + '">' + c[1] + '<i class="ar' + (on ? ' on' : '') + '">' + (on ? (dsort.dir > 0 ? '▲' : '▼') : '↕') + '</i></th>'; }).join('') + '</tr><tr class="fr"><th class="ck"></th>' + DCOL.map(function (c) {
         var k = c[0], f = dfil[k] || '';
         if (k === 'status') return '<th><select class="fi" data-k="status"><option value="">전체</option>' + STS.map(function (x) { return '<option' + (f === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></th>';
         return '<th><input class="fi" data-k="' + k + '" value="' + esc(f) + '" placeholder="필터" autocomplete="off"></th>'; }).join('') + '</tr></thead><tbody>' +
@@ -358,6 +368,10 @@
       i.addEventListener('contextmenu', function (e) { if (i.readOnly) e.preventDefault(); });
       i.addEventListener('blur', function () { i.readOnly = true; i.classList.remove('ed'); });
     });
+    $$('th.sk', v).forEach(function (th) { th.addEventListener('click', function () {
+      var k = th.getAttribute('data-sk');
+      if (dsort.k !== k) { dsort.k = k; dsort.dir = 1; } else if (dsort.dir === 1) dsort.dir = -1; else { dsort.k = null; dsort.dir = 1; }
+      viewDrivers(v); }); });
     $$('.fi', v).forEach(function (f) {
       var k = f.getAttribute('data-k'), comp = false;
       var apply = function () { dfil[k] = f.value; dsel = {}; dfoc = f.tagName === 'INPUT' ? { k: k, pos: f.selectionStart } : null; viewDrivers(v); };
@@ -367,6 +381,7 @@
       f.addEventListener('input', function () { if (!comp) apply(); });
     });
     if (dfoc) { var ff = $('.fi[data-k="' + dfoc.k + '"]', v); if (ff) { ff.focus(); try { ff.setSelectionRange(dfoc.pos, dfoc.pos); } catch (e) { } } dfoc = null; }
+    var sc = $('#dsclr', v); if (sc) sc.addEventListener('click', function () { dsort = { k: null, dir: 1 }; viewDrivers(v); });
     var fc = $('#dfclr', v); if (fc) fc.addEventListener('click', function () { dfil = {}; dsel = {}; viewDrivers(v); });
     $$('.note', v).forEach(function (n) { n.addEventListener('click', function () { noteModal(drivers.filter(function (x) { return x.id === n.getAttribute('data-id'); })[0], v); }); });
     $$('input.cell, select.cell', v).forEach(function (i) {

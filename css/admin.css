@@ -138,3 +138,11 @@ table.dt tr.fr th.mg{background:#ffe9f1}
 /* v1.6 금액 오른쪽 정렬 */
 @media(min-width:761px){table.dt th.am{text-align:right;padding-right:12px}table.dt td.am{text-align:right;padding-right:3px;padding-left:3px}table.dt td.am input.cell{text-align:right;padding-right:10px}table.dt tr.fr th.am{padding-right:3px}}
 table.dt td input.cell{font-size:12.5px}
+
+/* v1.7 정렬 */
+table.dt th.sk{cursor:pointer;user-select:none}table.dt th.sk:hover{background:#eef1f7}
+table.dt th .ar{font-style:normal;font-size:9px;color:#c3c8d4;margin-left:3px}table.dt th .ar.on{color:var(--navy);font-size:10px}
+
+table.dt th.sk{position:relative}
+table.dt th .ar{position:absolute;right:2px;top:50%;transform:translateY(-50%);margin:0;background:inherit;visibility:hidden;line-height:1;padding:2px 0}
+table.dt th.sk:hover .ar,table.dt th .ar.on{visibility:visible}
