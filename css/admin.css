@@ -85,3 +85,24 @@ td.ck,th.ck{width:36px;padding-right:0}td.ck input,th.ck input{width:18px;height
 input[type=file].hid{display:none}
 @media(max-width:760px){.grid3{grid-template-columns:1fr}td.ck{display:flex}}
 td input.cell[data-k=ssn]{min-width:150px}td input.cell[data-k=phone]{min-width:130px}td input.cell[data-k=ins_company],td input.cell[data-k=deposit_group]{min-width:110px}td input.cell[type=date]{min-width:130px}
+
+/* 기사 가입 현황: 한 화면에 모두 보이게 + 가운데 정렬 */
+.dtw{overflow-x:auto}
+table.dt{table-layout:fixed;width:100%;min-width:1180px}
+table.dt th,table.dt td{text-align:center;padding:8px 3px;overflow:hidden;text-overflow:ellipsis}
+table.dt th{font-size:12px}
+table.dt th.ck,table.dt td.ck{padding-right:3px}
+table.dt td input.cell{width:100%;min-width:0!important;text-align:center;padding:5px 2px;font-size:13px}
+table.dt td input.num{text-align:center}
+@media(max-width:760px){table.dt{min-width:0;table-layout:auto}table.dt td input.cell{text-align:right}table.dt td.ck{justify-content:flex-start}}
+/* 기사 등록됨: 저장 버튼과 같은 크기 */
+.tag.big{display:inline-flex;align-items:center;padding:10px 14px;font-size:14px;font-weight:700;border-radius:999px;line-height:1.5}
+
+.claim table{min-width:0;max-width:640px}
+.claim th{font-size:13px}.claim td,.claim th{padding:12px 14px}
+a.callno{display:inline-block;padding:6px 14px;border-radius:999px;background:#eef2fb;color:var(--navy);font-weight:700;text-decoration:none;font-size:15px}
+a.callno:hover{background:var(--navy);color:var(--gold)}
+@media(max-width:760px){.claim table,.claim tbody,.claim tr,.claim td{display:block}.claim thead{display:none}.claim tr{display:flex;justify-content:space-between;align-items:center;padding:6px 10px}}
+@media(max-width:760px){.claim td::before{content:none}.claim td.nl{padding:10px 0}}
+
+input.cell[data-k="phone"]{color:var(--navy);text-decoration:underline;text-underline-offset:3px;cursor:pointer}input.cell[data-k="phone"].ed{text-decoration:none;color:inherit;cursor:text}

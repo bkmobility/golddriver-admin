@@ -14,7 +14,7 @@
   var PAY = { none: '-', requested: '안내 요청', paid: '결제 완료' }, LIC = { none: '미제출', submitted: '제출됨', confirmed: '확인 완료' };
   var APPN = { logi: '로지', callmaner: '콜마너', aicon: '아이콘', tmap: '티맵대리', kakao: '카카오T대리', handle: '핸들포유', none: '처음입니다' };
   var CAR = { SKT: 'SK', KT: 'KT', LGU: 'U+', SKT_MVNO: 'SK알뜰폰', KT_MVNO: 'KT알뜰폰', LGU_MVNO: 'U+알뜰폰' }, OWN = { self: '본인 명의', other: '타인 명의' };
-  var TABS = [['home', '오늘 할 일'], ['apps', '가입 신청'], ['drivers', '기사 가입 현황'], ['pay', '결제'], ['log', '처리 기록']];
+  var TABS = [['home', '오늘 할 일'], ['apps', '가입 신청'], ['drivers', '기사 가입 현황'], ['pay', '결제'], ['log', '처리 기록'], ['claim', '사고접수']];
   var OWNER_EMAIL = 'bbw135@gmail.com';
   var tab = 'home', apps = [], drivers = [], logs = [], adminName = '관리자', filter = 'all', q = '', uid = null;
 
@@ -85,7 +85,7 @@
     $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '">' + t[1] + (t[0] === 'apps' && badge ? '<span class="dot">' + badge + '</span>' : '') + '</button>'; }).join('');
     $$('#tabs button').forEach(function (b) { b.addEventListener('click', function () { tab = b.getAttribute('data-t'); render(); }); });
     var v = $('#view');
-    ({ home: viewHome, apps: viewApps, drivers: viewDrivers, pay: viewPay, log: viewLog })[tab](v);
+    ({ home: viewHome, apps: viewApps, drivers: viewDrivers, pay: viewPay, log: viewLog, claim: viewClaim })[tab](v);
   }
 
   /* ---------- 오늘 할 일 ---------- */
@@ -176,7 +176,7 @@
       '<div id="licarea"></div>' +
       '<div class="grid2"><div class="f"><label>상태</label><select id="d-st">' + sOpts + '</select></div><div class="f"><label>담당자</label><input id="d-as" value="' + esc(a.assignee || '') + '"></div></div>' +
       '<div class="f"><label>메모</label><textarea id="d-memo">' + esc(a.memo || '') + '</textarea></div>' +
-      '<div class="acts"><button class="btn" id="d-save">저장</button>' + (a.driver_id ? '<span class="tag g">기사 등록됨</span>' : '<button class="btn dark" id="d-reg">가입 완료 처리 → 기사 등록</button>') + '</div></div>';
+      '<div class="acts"><button class="btn" id="d-save">저장</button>' + (a.driver_id ? '<span class="tag g big">기사 등록됨</span>' : '<button class="btn dark" id="d-reg">가입 완료 처리 → 기사 등록</button>') + '</div></div>';
     d.hidden = false;
     d.addEventListener('click', function h(e) { if (e.target === d) { d.hidden = true; d.removeEventListener('click', h); } });
     $('#dx').addEventListener('click', function () { d.hidden = true; });
@@ -290,7 +290,9 @@
 
   /* ---------- 기사 가입 현황 ---------- */
   var DCOL = [['joined_at', '가입일', 'd'], ['emp_no', '사번', 'n'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 's'], ['phone', '핸드폰 번호'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'],
-    ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n'], ['callmaner_cost', '콜마너 비용', 'n']];
+    ['callmaner_cost', '콜마너 비용', 'n'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n']];
+  var DW = { joined_at: 8, emp_no: 5, team: 6, name: 6, ssn: 9.5, phone: 9.5, ins_company: 8, insurance: 6.5, deposit_group: 7.5, callmaner_cost: 6, daily_fee: 5.5, insurance_cost: 6, total_cost: 7, margin: 6.5 };
+  var dsel = {};
   var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 보험회사명: 'ins_company', 보험회사: 'ins_company',
     보험종류: 'insurance', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
   var dq = '';
@@ -299,24 +301,40 @@
     var rows = drivers.filter(function (d) { var t = (d.name + d.phone + d.emp_no + (d.team || '') + (d.deposit_group || '') + (d.ins_company || '')).toLowerCase(); return !dq || t.indexOf(dq.toLowerCase()) >= 0; })
       .sort(function (a, b) { return a.emp_no - b.emp_no; });
     var sum = function (k) { return rows.reduce(function (s, d) { return s + (d[k] || 0); }, 0); };
-    v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정 · 순 마진 합계 ' + n0(sum('margin')) + '원</span></div>' +
-      '<div class="tw"><table><thead><tr>' + DCOL.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    var selN = rows.filter(function (d) { return dsel[d.id]; }).length, allOn = rows.length > 0 && selN === rows.length;
+    v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정(전화번호는 누르면 전화, 길게 누르면 수정) · 순 마진 합계 ' + n0(sum('margin')) + '원</span></div>' +
+      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button></div>' +
+      '<div class="tw dtw"><table class="dt"><colgroup><col style="width:3%">' + DCOL.map(function (c) { return '<col style="width:' + DW[c[0]] + '%">'; }).join('') + '</colgroup><thead><tr><th class="ck"></th>' + DCOL.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
       rows.map(function (d) {
-        return '<tr>' + DCOL.map(function (c) {
+        return '<tr><td class="ck"><input type="checkbox" class="dk" data-id="' + d.id + '"' + (dsel[d.id] ? ' checked' : '') + '></td>' + DCOL.map(function (c) {
           var val = dval(d, c), k = c[0], t = c[2];
           var cls = 'cell' + (t === 'n' ? ' num' : '');
-          if (k === 'phone') return '<td data-l="' + c[1] + '"><input class="cell" data-id="' + d.id + '" data-k="phone" value="' + esc(val) + '"> <a href="' + tel(d.phone) + '">📞</a></td>';
+          if (k === 'phone') return '<td data-l="' + c[1] + '"><input class="cell" data-id="' + d.id + '" data-k="phone" value="' + esc(val) + '" readonly title="누르면 전화 · 길게 누르거나 더블클릭하면 수정"></td>';
           if (k === 'name') return '<td data-l="성명"><b><input class="cell" data-id="' + d.id + '" data-k="name" value="' + esc(val) + '"></b></td>';
           if (k === 'ssn') return '<td data-l="주민번호"><input class="cell ssn" data-id="' + d.id + '" data-k="ssn" data-full="' + esc(fmtSsn(d.ssn)) + '" value="' + esc(maskSsn(d.ssn)) + '" maxlength="14" autocomplete="off" placeholder="000000-0000000"></td>';
-          if (t === 'd') return '<td data-l="가입일"><input class="cell" type="date" data-id="' + d.id + '" data-k="' + k + '" data-n="d" value="' + esc(val) + '"></td>';
+          if (t === 'd') return '<td data-l="가입일"><input class="cell" type="text" inputmode="numeric" maxlength="10" data-id="' + d.id + '" data-k="' + k + '" data-n="d" placeholder="0000-00-00" value="' + esc(val) + '"></td>';
           return '<td data-l="' + c[1] + '"><input class="' + cls + '" data-id="' + d.id + '" data-k="' + k + '" data-n="' + (t || '') + '" value="' + esc(val) + '"' + (k === 'emp_no' ? ' readonly' : '') + '></td>';
         }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">아직 기사가 없어요. 가입 신청에서 "가입 완료 처리"를 하면 아래에 순서대로 추가돼요.</div>');
-    $('#dq', v).addEventListener('change', function () { dq = this.value; render(); });
+    $$('.dk', v).forEach(function (c) { c.addEventListener('change', function () { if (c.checked) dsel[c.getAttribute('data-id')] = 1; else delete dsel[c.getAttribute('data-id')]; viewDrivers(v); }); });
+    $('#dselall', v).addEventListener('change', function () { var on = this.checked; rows.forEach(function (d) { if (on) dsel[d.id] = 1; else delete dsel[d.id]; }); viewDrivers(v); });
+    $('#dseldel', v).addEventListener('click', function () { deleteDrivers(rows.filter(function (d) { return dsel[d.id]; }), false); });
+    $('#dalldel', v).addEventListener('click', function () { deleteDrivers(drivers.slice(), true); });
+    $('#dq', v).addEventListener('change', function () { dq = this.value; dsel = {}; render(); });
     $$('input.ssn', v).forEach(function (i) {
       i.addEventListener('focus', function () { i.value = i.getAttribute('data-full') || ''; });
       i.addEventListener('input', function () { var d = i.value.replace(/[^0-9]/g, '').slice(0, 13); i.value = d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; });
       i.addEventListener('blur', function () { i.value = maskSsn(i.value); });
+    });
+    $$('input.cell[data-k="phone"]', v).forEach(function (i) {
+      var tm = null;
+      function edit() { i.readOnly = false; i.classList.add('ed'); i.focus(); i.select(); }
+      i.addEventListener('click', function () { if (!i.readOnly) return; var dg = i.value.replace(/[^0-9]/g, ''); if (dg) location.href = 'tel:' + dg; });
+      i.addEventListener('dblclick', edit);
+      i.addEventListener('touchstart', function () { tm = setTimeout(function () { tm = null; edit(); }, 600); }, { passive: true });
+      ['touchend', 'touchmove', 'touchcancel'].forEach(function (e) { i.addEventListener(e, function () { if (tm) { clearTimeout(tm); tm = null; } }, { passive: true }); });
+      i.addEventListener('contextmenu', function (e) { if (i.readOnly) e.preventDefault(); });
+      i.addEventListener('blur', function () { i.readOnly = true; i.classList.remove('ed'); });
     });
     $$('input.cell', v).forEach(function (i) {
       i.addEventListener('change', function () {
@@ -325,6 +343,7 @@
         if (k === 'ssn') { var dg = val.replace(/[^0-9]/g, ''); if (dg && dg.length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); i.value = maskSsn(d.ssn); return; } val = dg ? fmtSsn(dg) : null; }
         else if (i.getAttribute('data-n') === 'n') { val = val === '' ? 0 : parseInt(val.replace(/[^0-9\-]/g, ''), 10); if (isNaN(val)) { toast('숫자만 입력해 주세요'); return; } }
         else if (k === 'phone') val = val.replace(/[^0-9]/g, '');
+        else if (k === 'joined_at') { var dd = toDate(val); if (!dd) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); i.value = d.joined_at || ''; return; } val = dd; i.value = dd; }
         else if (k !== 'name') val = val || null;
         upd[k] = val;
         if (k === 'daily_fee') { upd.total_cost = calcTotal(val); upd.margin = calcMargin(upd.total_cost); }
@@ -341,6 +360,26 @@
     $('#dxl', v).addEventListener('click', function () { exportDriversXlsx(rows); });
     $('#dup', v).addEventListener('click', function () { $('#dfile', v).click(); });
     $('#dfile', v).addEventListener('change', function () { var f = this.files[0]; this.value = ''; if (f) importDrivers(f); });
+  }
+  function deleteDrivers(list, all) {
+    if (!list.length) return;
+    var m = $('#modal'), names = list.slice(0, 5).map(function (d) { return esc(d.name); }).join(', ') + (list.length > 5 ? ' 외 ' + (list.length - 5) + '명' : '');
+    m.innerHTML = '<div class="mbox"><h3 style="color:#d93a3a">⚠ ' + (all ? '기사 가입 현황 전체(' + list.length + '명)를 삭제할까요?' : '선택한 ' + list.length + '명을 삭제할까요?') + '</h3>' +
+      '<div style="line-height:1.7"><b>삭제하면 되돌릴 수 없습니다.</b><br><span class="mut">' + names + '</span><br><span class="mut">해당 기사들의 가입 신청 기록은 남고, "기사 등록됨" 표시만 해제돼요.</span></div>' +
+      '<div class="acts"><button class="btn sm line" id="x-bk">삭제 전에 백업 받기</button></div>' +
+      (all ? '<div class="f"><label>계속하려면 <b>전체삭제</b> 라고 입력하세요</label><input id="x-conf" autocomplete="off"></div>' : '') +
+      '<div class="acts"><button class="btn red" id="x-ok"' + (all ? ' disabled' : '') + '>삭제</button><button class="btn line" id="x-no">취소</button></div></div>';
+    m.hidden = false;
+    $('#x-no').addEventListener('click', function () { m.hidden = true; });
+    $('#x-bk').addEventListener('click', backupAll);
+    if (all) $('#x-conf').addEventListener('input', function () { $('#x-ok').disabled = this.value.trim() !== '전체삭제'; });
+    $('#x-ok').addEventListener('click', function () {
+      this.disabled = true;
+      var ids = list.map(function (d) { return d.id; }), groups = chunk(ids, 100);
+      groups.reduce(function (p, c) { return p.then(function () { return sb.from('golddriver_drivers').delete().in('id', c).then(chk); }).then(function () { return sb.from('golddriver_applications').update({ driver_id: null }).in('driver_id', c).then(chk); }); }, Promise.resolve())
+        .then(function () { logAct('기사 가입 현황 ' + (all ? '전체 ' : '') + ids.length + '명 삭제 (' + list.slice(0, 3).map(function (d) { return d.name; }).join(', ') + (list.length > 3 ? ' 외' : '') + ')', null); dsel = {}; m.hidden = true; toast(ids.length + '명 삭제했어요'); return loadAll().then(render); })
+        .catch(function (e) { toast('삭제 실패: ' + e.message, 6000); var b = $('#x-ok'); if (b) b.disabled = false; });
+    });
   }
   function exportDriversXlsx(rows) {
     var head = DCOL.map(function (c) { return c[1]; });
@@ -475,6 +514,15 @@
     fr.readAsText(file);
   }
   function chk(r) { if (r.error) throw new Error(r.error.message); return r; }
+
+  /* ---------- 사고접수 번호 ---------- */
+  var CLAIMS = [['삼성화재', '1588-5114'], ['현대해상', '1588-5656'], ['DB손해보험', '1588-0100'], ['KB손해보험', '1544-0114'], ['메리츠화재', '1566-7711'], ['한화손해보험', '1566-8000'], ['롯데손해보험', '1588-3344'], ['하나손해보험', '1566-3000'], ['캐롯(한화손보 캐롯)', '1566-0300'], ['MG손해보험', '1588-5959']];
+  function viewClaim(v) {
+    v.innerHTML = '<h2>보험사 사고접수 번호</h2><div class="mut" style="margin:-6px 0 10px">번호를 누르면 바로 전화가 연결돼요. (PC는 연결된 전화 앱, 폰은 통화 화면)</div>' +
+      '<div class="tw claim"><table><thead><tr><th>보험사</th><th>사고접수 전화번호</th></tr></thead><tbody>' +
+      CLAIMS.map(function (c) { return '<tr><td class="nl"><b>' + esc(c[0]) + '</b></td><td data-l="사고접수"><a class="callno" href="tel:' + c[1].replace(/[^0-9]/g, '') + '">' + esc(c[1]) + '</a></td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
 
   /* ---------- CSV ---------- */
   function csv(name, head, rows) {
