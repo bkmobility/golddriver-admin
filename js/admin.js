@@ -17,6 +17,7 @@
   var TABS = [['home', '오늘 할 일'], ['apps', '가입 신청'], ['drivers', '기사 가입 현황'], ['stats', '통계'], ['pay', '결제'], ['log', '처리 기록'], ['claim', '사고접수']];
   var BNAV = [['home', '오늘 할 일', '☑'], ['apps', '가입 신청', '📝'], ['drivers', '기사', '👤'], ['pay', '결제', '₩'], ['more', '더보기', '⋯']];
   var OWNER_EMAIL = 'bbw135@gmail.com';
+  var histOn = false, curTab = 'home', fromPop = false, exitArm = false, skipPop = 0, popClosing = false, ovStack = [];
   var tab = 'home', apps = [], drivers = [], logs = [], adminName = '관리자', filter = 'all', q = '', uid = null;
 
   function toast(m, ms) { var t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, ms || 3000); }
@@ -52,7 +53,7 @@
         }
         adminName = (s.user.email || '').toLowerCase() === OWNER_EMAIL ? '관리자' : (s.user.email || a.data.name); $('#who').textContent = adminName;
         $('#login').hidden = true; $('#main').hidden = false;
-        loadAll().then(function () { render(); subscribe(); });
+        loadAll().then(function () { initHist(); render(); subscribe(); });
       });
     });
   }
@@ -83,6 +84,7 @@
   function openApps() { return apps.filter(function (a) { return a.status !== 'complete' && a.status !== 'canceled'; }); }
   function render() {
     var badge = apps.filter(function (a) { return a.status === 'new'; }).length;
+    if (histOn && tab !== curTab) { if (!fromPop) history.pushState({ gd: 'tab', tab: tab }, ''); curTab = tab; } fromPop = false;
     $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '">' + t[1] + (t[0] === 'apps' && badge ? '<span class="dot">' + badge + '</span>' : '') + '</button>'; }).join('');
     $$('#tabs button').forEach(function (b) { b.addEventListener('click', function () { tab = b.getAttribute('data-t'); render(); }); });
     var v = $('#view'), bn = $('#bnav'), mm = isM();
@@ -879,6 +881,27 @@
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([t], { type: 'text/csv;charset=utf-8' })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
   }
 
+  function initHist() {
+    if (histOn) return; histOn = true;
+    history.replaceState({ gd: 'root' }, ''); history.pushState({ gd: 'tab', tab: tab }, ''); curTab = tab;
+    ['modal', 'drawer', 'medit'].forEach(function (id) {
+      var el = $('#' + id), was = !el.hidden;
+      new MutationObserver(function () {
+        var open = !el.hidden;
+        if (id === 'medit' && !open) document.body.classList.remove('noscroll');
+        if (open && ovStack.indexOf(id) < 0) { ovStack.push(id); history.pushState({ gd: 'ov', id: id }, ''); }
+        else if (!open && ovStack.indexOf(id) >= 0) { ovStack.splice(ovStack.indexOf(id), 1); if (!popClosing) { skipPop++; history.back(); } }
+      }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+    });
+    window.addEventListener('popstate', function (e) {
+      if (skipPop > 0) { skipPop--; return; }
+      if (ovStack.length) { var id = ovStack[ovStack.length - 1]; popClosing = true; $('#' + id).hidden = true; Promise.resolve().then(function () { popClosing = false; }); return; }
+      var st = e.state || {};
+      if (st.gd === 'tab' && st.tab) { tab = st.tab; curTab = tab; fromPop = true; render(); window.scrollTo(0, 0); return; }
+      if (exitArm) { exitArm = false; history.back(); return; }
+      exitArm = true; setTimeout(function () { exitArm = false; }, 2000); toast('한 번 더 누르면 나가요', 2000); history.pushState({ gd: 'tab', tab: tab }, '');
+    });
+  }
   var mqh = function () { if (uid && !$('#main').hidden) render(); };
   if (MQ.addEventListener) MQ.addEventListener('change', mqh); else if (MQ.addListener) MQ.addListener(mqh);
   boot();
