@@ -115,3 +115,26 @@ table.dt tr.fr th{padding:3px 2px;background:#fafbfd}
 td.nt{text-align:left!important}.note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;cursor:pointer;padding:5px 4px;border-radius:6px;border:1px solid transparent}.note:hover{border-color:var(--line);background:#fff}
 textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
 @media(max-width:760px){table.dt tr.fr{display:none}td.nt{text-align:right!important}.note{max-width:60%;white-space:normal}select.cell.st{width:auto;padding:4px 14px}}
+
+/* v1.5 합계 카드·유입 경로 */
+.sumrow{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.sc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 14px;display:flex;flex-direction:column;min-width:96px}
+.sc span{font-size:11px;color:var(--mut)}.sc b{font-size:16px;color:var(--navy)}.sc b.g{color:var(--grn)}.sc b.y{color:#b07800}
+.sc.main{background:var(--navy);border-color:var(--navy);min-width:200px}.sc.main span{color:#c9d2ee}.sc.main b{color:var(--gold);font-size:22px}
+table.dt tfoot td{background:#fafbfd;border-top:2px solid var(--line);font-size:12px;padding:8px 2px}
+table.dt th{white-space:nowrap}
+@media(max-width:760px){table.dt tfoot{display:none}.sc{flex:1 1 40%}.sc.main{flex:1 1 100%}}
+@media(max-width:1440px){table.dt th{font-size:11px;letter-spacing:-.4px}}
+
+/* v1.6 가운데 정렬 · 순 마진 색 */
+.sc{align-items:center;text-align:center;justify-content:center}
+table.dt th.mg{background:#ffd9e6;color:#b3123f}
+table.dt td.mg{background:#fff0f5}
+table.dt td.mg input.cell{color:#c2185b;font-weight:800}
+table.dt tfoot td.mg{background:#ffd9e6}table.dt tfoot td.mg b{color:#b3123f}
+table.dt tr.fr th.mg{background:#ffe9f1}
+.selbar{flex-wrap:wrap}.selbar label,.selbar .btn,.selbar span{white-space:nowrap}
+
+/* v1.6 금액 오른쪽 정렬 */
+@media(min-width:761px){table.dt th.am{text-align:right;padding-right:12px}table.dt td.am{text-align:right;padding-right:3px;padding-left:3px}table.dt td.am input.cell{text-align:right;padding-right:10px}table.dt tr.fr th.am{padding-right:3px}}
+table.dt td input.cell{font-size:12.5px}
