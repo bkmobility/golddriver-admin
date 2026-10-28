@@ -4,7 +4,7 @@ html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 "Noto Sans
 button{font:inherit;cursor:pointer}
 [hidden]{display:none!important}
 .lg{font-weight:800;color:var(--navy);display:flex;align-items:center;gap:.45rem;white-space:nowrap}
-.lg i{width:26px;height:26px;border-radius:50%;background:var(--gold);color:var(--navy);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-weight:800}
+.lg img{width:28px;height:28px;border-radius:50%;display:block}
 .lg small{color:var(--mut);font-weight:500}
 .loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--navy)}
 .lbox{background:#fff;border-radius:16px;padding:28px 24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px}
@@ -49,7 +49,7 @@ td input.num{text-align:right;min-width:90px}
 @keyframes in{from{transform:translateX(30px);opacity:0}}
 .dbox h3{margin:0 0 4px;color:var(--navy);font-size:19px}
 .kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;margin:12px 0;font-size:14px}.kv dt{color:var(--mut)}.kv dd{margin:0;word-break:break-all}
-.acts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
 .acts a{text-decoration:none}
 .lic{width:100%;border:1px solid var(--line);border-radius:10px;margin:6px 0}
 .f{margin:8px 0}.f label{display:block;font-size:12px;color:var(--mut);margin-bottom:2px}
@@ -71,3 +71,17 @@ td input.num{text-align:right;min-width:90px}
  td input.cell{text-align:right}
  .grid2{grid-template-columns:1fr}
 }
+
+/* v1.3 관리자 */
+.todo.clk{cursor:pointer}.todo.clk:hover{background:#fafbfd}
+td.ck,th.ck{width:36px;padding-right:0}td.ck input,th.ck input{width:18px;height:18px;padding:0;accent-color:var(--navy);cursor:pointer}
+.selbar{display:flex;gap:8px;align-items:center;margin:0 0 8px;font-size:13px}
+.btn.red.sm:disabled,.btn.sm:disabled{opacity:.4;cursor:default}
+.mbox.wide{max-width:640px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hint{font-size:12px;color:var(--mut);margin-top:2px}
+.ocr{font-size:12px;margin-top:2px}.ocr.ok{color:var(--grn)}.ocr.bad{color:var(--red)}
+.radio{display:flex;gap:8px;align-items:flex-start;padding:8px 0;font-size:14px}.radio input{width:auto;margin-top:4px}
+input[type=file].hid{display:none}
+@media(max-width:760px){.grid3{grid-template-columns:1fr}td.ck{display:flex}}
+td input.cell[data-k=ssn]{min-width:150px}td input.cell[data-k=phone]{min-width:130px}td input.cell[data-k=ins_company],td input.cell[data-k=deposit_group]{min-width:110px}td input.cell[type=date]{min-width:130px}

@@ -4,11 +4,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>골드대리운전 관리자</title>
+<link rel="icon" href="img/logo.png">
 <link rel="stylesheet" href="css/admin.css">
 </head><body>
 <div id="login" class="loginwrap" hidden>
   <form id="lform" class="lbox">
-    <div class="lg"><i>G</i>골드대리운전</div>
+    <div class="lg"><img src="img/logo.png" alt="">골드대리운전</div>
     <h1>관리자 로그인</h1>
     <input id="em" type="email" placeholder="이메일" autocomplete="username" required>
     <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password" required>
@@ -18,7 +19,7 @@
 </div>
 <div id="main" hidden>
   <header>
-    <div class="lg"><i>G</i>골드대리운전 <small>관리자</small></div>
+    <div class="lg"><img src="img/logo.png" alt="">골드대리운전 <small>관리자</small></div>
     <nav id="tabs"></nav>
     <div class="who"><span id="who"></span><button class="btn sm line" id="logout">로그아웃</button></div>
   </header>
@@ -28,6 +29,7 @@
 <div id="modal" class="modalbg" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="js/supabase.js"></script>
+<script src="js/xlsx.full.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/admin.js"></script>
 </body></html>
