@@ -201,8 +201,8 @@
   }
 
   /* ---------- 계산 규칙: 월 합산 비용 = 일비 × 30 − 1,000 / 순 마진 = 월 합산 비용 ÷ 2 ---------- */
-  function calcTotal(daily) { daily = parseInt(daily, 10) || 0; return daily > 0 ? daily * 30 - 1000 : 0; }
-  function calcMargin(total) { return Math.round((parseInt(total, 10) || 0) / 2); }
+  function calcTotal(daily) { return (parseInt(daily, 10) || 0) * 30; }
+  function calcMargin(total, chang, real, cm) { var g = function (x) { return parseInt(x, 10) || 0; }; return Math.round((g(total) - g(chang) - g(real) + g(cm)) / 2); }
   function fmtSsn(s) { var d = String(s || '').replace(/[^0-9]/g, ''); return d.length === 13 ? d.slice(0, 6) + '-' + d.slice(6) : String(s || ''); }
   function maskSsn(s) { var d = String(s || '').replace(/[^0-9]/g, ''); return d.length === 13 ? d.slice(0, 6) + '-' + d.slice(6, 7) + '******' : String(s || ''); }
   function todayStr() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -262,14 +262,16 @@
         '<div class="grid3"><div class="f"><label>가입일</label><input id="r-date" type="date" value="' + todayStr() + '"></div><div class="f"><label>사번</label><input id="r-emp" type="number" value="' + (r.data || '') + '"></div><div class="f"><label>소속</label><input id="r-team" value="골드 2팀"></div>' +
         '<div class="f"><label>성명</label><input id="r-name" value="' + esc(a.name) + '"></div><div class="f"><label>주민번호</label><input id="r-ssn" placeholder="000000-0000000" maxlength="14" autocomplete="off"><div class="ocr" id="r-ocr"></div></div><div class="f"><label>핸드폰 번호</label><input id="r-phone" value="' + esc(fmtPhone(a.phone)) + '"></div>' +
         '<div class="f"><label>보험 회사명</label><input id="r-co"></div><div class="f"><label>보험 종류</label><input id="r-ins" value="' + ins + '"></div><div class="f"><label>입금 그룹명</label><input id="r-dep"></div>' +
-        '<div class="f"><label>일비</label><input id="r-daily" type="number" inputmode="numeric" value=""></div><div class="f"><label>실보험료</label><input id="r-real" type="number" inputmode="numeric" value="0"></div><div class="f"><label>콜마너 비용</label><input id="r-cm" type="number" inputmode="numeric" value="0"></div>' +
-        '<div class="f"><label>월 합산 비용 (일비×30−1,000)</label><input id="r-tot" type="number" value="0"></div><div class="f"><label>순 마진 (월 합산÷2)</label><input id="r-mar" type="number" value="0"></div></div>' +
+        '<div class="f"><label>일비</label><input id="r-daily" type="number" inputmode="numeric" value=""></div><div class="f"><label>실보험료</label><input id="r-real" type="number" inputmode="numeric" value="0"></div><div class="f"><label>창 비용</label><input id="r-chang" type="number" inputmode="numeric" value="17000"></div>' +
+        '<div class="f"><label>콜마너 비용</label><input id="r-cm" type="number" inputmode="numeric" value="0"></div><div class="f"><label>월 합산 비용 (일비×30)</label><input id="r-tot" type="number" value="0"></div><div class="f"><label>순 마진 ((월합산−창비용−실보험료+콜마너)÷2)</label><input id="r-mar" type="number" value="0"></div></div>' +
         '<div class="f"><label>비고</label><input id="r-note"></div>' +
         '<div class="acts"><button class="btn" id="r-ok">등록</button><button class="btn line" id="r-no">취소</button></div></div>';
       m.hidden = false;
       $('#r-ssn').addEventListener('input', function () { var d = this.value.replace(/[^0-9]/g, '').slice(0, 13); this.value = d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; });
-      $('#r-daily').addEventListener('input', function () { var t = calcTotal(this.value); $('#r-tot').value = t; $('#r-mar').value = calcMargin(t); });
-      $('#r-tot').addEventListener('input', function () { $('#r-mar').value = calcMargin(this.value); });
+      var rmar = function () { $('#r-mar').value = calcMargin($('#r-tot').value, $('#r-chang').value, $('#r-real').value, $('#r-cm').value); };
+      $('#r-daily').addEventListener('input', function () { $('#r-tot').value = calcTotal(this.value); rmar(); });
+      ['#r-tot', '#r-chang', '#r-real', '#r-cm'].forEach(function (q) { $(q).addEventListener('input', rmar); });
+      rmar();
       $('#r-no').addEventListener('click', function () { m.hidden = true; });
       if (a.license_path) {
         ocrSsn(a.license_path, function (msg, cls) { var o = $('#r-ocr'); if (o) { o.className = 'ocr ' + cls; o.textContent = msg; } }).then(function (s) { var el = $('#r-ssn'); if (s && el && !el.value) el.value = s; });
@@ -277,7 +279,7 @@
       $('#r-ok').addEventListener('click', function () {
         var n = function (id) { return $(id).value.trim(); };
         var p = { joined_at: n('#r-date'), emp_no: n('#r-emp'), team: n('#r-team'), name: n('#r-name'), ssn: n('#r-ssn'), phone: n('#r-phone'), ins_company: n('#r-co'), insurance: n('#r-ins'), deposit_group: n('#r-dep'),
-          daily_fee: n('#r-daily'), insurance_cost: n('#r-real'), callmaner_cost: n('#r-cm'), total_cost: n('#r-tot'), margin: n('#r-mar'), note: n('#r-note') };
+          daily_fee: n('#r-daily'), insurance_cost: n('#r-real'), chang_fee: n('#r-chang'), status: '가입', callmaner_cost: n('#r-cm'), total_cost: n('#r-tot'), margin: n('#r-mar'), note: n('#r-note') };
         if (p.ssn && p.ssn.replace(/[^0-9]/g, '').length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); return; }
         this.disabled = true;
         sb.rpc('golddriver_register_driver', { p_application_id: a.id, p: p }).then(function (x) {
@@ -289,30 +291,38 @@
   }
 
   /* ---------- 기사 가입 현황 ---------- */
-  var DCOL = [['joined_at', '가입일', 'd'], ['emp_no', '사번', 'n'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 's'], ['phone', '핸드폰 번호'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'],
-    ['callmaner_cost', '콜마너 비용', 'n'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n']];
-  var DW = { joined_at: 8, emp_no: 5, team: 6, name: 6, ssn: 9.5, phone: 9.5, ins_company: 8, insurance: 6.5, deposit_group: 7.5, callmaner_cost: 6, daily_fee: 5.5, insurance_cost: 6, total_cost: 7, margin: 6.5 };
+  var DCOL = [['joined_at', '가입일', 'd'], ['status', '상태', 't'], ['emp_no', '사번', 'n'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 's'], ['phone', '핸드폰 번호'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'],
+    ['callmaner_cost', '콜마너 비용', 'n'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n'], ['note', '비고', 'm']];
+  var DW = { joined_at: 6.5, status: 5, emp_no: 4, team: 5.5, name: 5, ssn: 8.5, phone: 8, ins_company: 6.5, insurance: 6, deposit_group: 9, callmaner_cost: 4.5, daily_fee: 4.5, insurance_cost: 5, chang_fee: 5, total_cost: 5.5, margin: 5.5, note: 8 };
+  var dfil = {}, dfoc = null, STS = ['가입', '퇴사', '미납'];
   var dsel = {};
   var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 보험회사명: 'ins_company', 보험회사: 'ins_company',
-    보험종류: 'insurance', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
+    보험종류: 'insurance', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 일관리비: 'daily_fee', 창비: 'chang_fee', 창비용: 'chang_fee', 상태: 'status', 천안콜마너비용: 'callmaner_cost', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
   var dq = '';
   function dval(d, c) { var v = d[c[0]]; if (v == null) return ''; if (c[0] === 'phone') return fmtPhone(v); return v; }
   function viewDrivers(v) {
     var rows = drivers.filter(function (d) { var t = (d.name + d.phone + d.emp_no + (d.team || '') + (d.deposit_group || '') + (d.ins_company || '')).toLowerCase(); return !dq || t.indexOf(dq.toLowerCase()) >= 0; })
+      .filter(function (d) { return DCOL.every(function (c) { var f = dfil[c[0]]; if (!f) return true; var s = c[0] === 'ssn' ? fmtSsn(d.ssn) : String(dval(d, c)); return c[0] === 'status' ? s === f : s.toLowerCase().indexOf(f.toLowerCase()) >= 0; }); })
       .sort(function (a, b) { return a.emp_no - b.emp_no; });
     var sum = function (k) { return rows.reduce(function (s, d) { return s + (d[k] || 0); }, 0); };
+    var dfN = Object.keys(dfil).filter(function (k) { return dfil[k]; }).length, DWT = 3 + DCOL.reduce(function (s, c) { return s + DW[c[0]]; }, 0);
     var selN = rows.filter(function (d) { return dsel[d.id]; }).length, allOn = rows.length > 0 && selN === rows.length;
-    v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정(전화번호는 누르면 전화, 길게 누르면 수정) · 순 마진 합계 ' + n0(sum('margin')) + '원</span></div>' +
-      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button></div>' +
-      '<div class="tw dtw"><table class="dt"><colgroup><col style="width:3%">' + DCOL.map(function (c) { return '<col style="width:' + DW[c[0]] + '%">'; }).join('') + '</colgroup><thead><tr><th class="ck"></th>' + DCOL.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm" id="dadd">+ 추가</button><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정(전화번호는 누르면 전화, 길게 누르면 수정) · 순 마진 합계 ' + n0(sum('margin')) + '원</span></div>' +
+      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button>' + (dfN ? '<button class="btn sm line" id="dfclr">필터 해제 (' + dfN + ')</button>' : '') + '</div>' +
+      '<div class="tw dtw"><table class="dt"><colgroup><col style="width:' + (300 / DWT).toFixed(2) + '%">' + DCOL.map(function (c) { return '<col style="width:' + (DW[c[0]] * 100 / DWT).toFixed(2) + '%">'; }).join('') + '</colgroup><thead><tr><th class="ck"></th>' + DCOL.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr><tr class="fr"><th class="ck"></th>' + DCOL.map(function (c) {
+        var k = c[0], f = dfil[k] || '';
+        if (k === 'status') return '<th><select class="fi" data-k="status"><option value="">전체</option>' + STS.map(function (x) { return '<option' + (f === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></th>';
+        return '<th><input class="fi" data-k="' + k + '" value="' + esc(f) + '" placeholder="필터" autocomplete="off"></th>'; }).join('') + '</tr></thead><tbody>' +
       rows.map(function (d) {
         return '<tr><td class="ck"><input type="checkbox" class="dk" data-id="' + d.id + '"' + (dsel[d.id] ? ' checked' : '') + '></td>' + DCOL.map(function (c) {
           var val = dval(d, c), k = c[0], t = c[2];
           var cls = 'cell' + (t === 'n' ? ' num' : '');
+          if (k === 'status') return '<td data-l="상태"><select class="cell st st-' + esc(d.status || '가입') + '" data-id="' + d.id + '" data-k="status">' + STS.map(function (x) { return '<option' + ((d.status || '가입') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></td>';
+          if (k === 'note') return '<td data-l="비고" class="nt"><div class="note" data-id="' + d.id + '" title="' + esc(d.note || '') + '">' + (d.note ? esc(d.note) : '<span class="mut">+ 메모</span>') + '</div></td>';
           if (k === 'phone') return '<td data-l="' + c[1] + '"><input class="cell" data-id="' + d.id + '" data-k="phone" value="' + esc(val) + '" readonly title="누르면 전화 · 길게 누르거나 더블클릭하면 수정"></td>';
           if (k === 'name') return '<td data-l="성명"><b><input class="cell" data-id="' + d.id + '" data-k="name" value="' + esc(val) + '"></b></td>';
           if (k === 'ssn') return '<td data-l="주민번호"><input class="cell ssn" data-id="' + d.id + '" data-k="ssn" data-full="' + esc(fmtSsn(d.ssn)) + '" value="' + esc(maskSsn(d.ssn)) + '" maxlength="14" autocomplete="off" placeholder="000000-0000000"></td>';
-          if (t === 'd') return '<td data-l="가입일"><input class="cell" type="text" inputmode="numeric" maxlength="10" data-id="' + d.id + '" data-k="' + k + '" data-n="d" placeholder="0000-00-00" value="' + esc(val) + '"></td>';
+          if (t === 'd') return '<td data-l="가입일"><input class="cell" type="text" inputmode="numeric" maxlength="10" data-id="' + d.id + '" data-k="' + k + '" data-n="d" placeholder="날짜 입력" value="' + esc(val) + '"></td>';
           return '<td data-l="' + c[1] + '"><input class="' + cls + '" data-id="' + d.id + '" data-k="' + k + '" data-n="' + (t || '') + '" value="' + esc(val) + '"' + (k === 'emp_no' ? ' readonly' : '') + '></td>';
         }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">아직 기사가 없어요. 가입 신청에서 "가입 완료 처리"를 하면 아래에 순서대로 추가돼요.</div>');
@@ -336,18 +346,29 @@
       i.addEventListener('contextmenu', function (e) { if (i.readOnly) e.preventDefault(); });
       i.addEventListener('blur', function () { i.readOnly = true; i.classList.remove('ed'); });
     });
-    $$('input.cell', v).forEach(function (i) {
+    $$('.fi', v).forEach(function (f) {
+      var k = f.getAttribute('data-k'), comp = false;
+      var apply = function () { dfil[k] = f.value; dsel = {}; dfoc = f.tagName === 'INPUT' ? { k: k, pos: f.selectionStart } : null; viewDrivers(v); };
+      if (f.tagName === 'SELECT') { f.addEventListener('change', apply); return; }
+      f.addEventListener('compositionstart', function () { comp = true; });
+      f.addEventListener('compositionend', function () { comp = false; apply(); });
+      f.addEventListener('input', function () { if (!comp) apply(); });
+    });
+    if (dfoc) { var ff = $('.fi[data-k="' + dfoc.k + '"]', v); if (ff) { ff.focus(); try { ff.setSelectionRange(dfoc.pos, dfoc.pos); } catch (e) { } } dfoc = null; }
+    var fc = $('#dfclr', v); if (fc) fc.addEventListener('click', function () { dfil = {}; dsel = {}; viewDrivers(v); });
+    $$('.note', v).forEach(function (n) { n.addEventListener('click', function () { noteModal(drivers.filter(function (x) { return x.id === n.getAttribute('data-id'); })[0], v); }); });
+    $$('input.cell, select.cell', v).forEach(function (i) {
       i.addEventListener('change', function () {
         var k = i.getAttribute('data-k'), val = i.value.trim(), id = i.getAttribute('data-id'), upd = {};
         var d = drivers.filter(function (x) { return x.id === id; })[0];
         if (k === 'ssn') { var dg = val.replace(/[^0-9]/g, ''); if (dg && dg.length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); i.value = maskSsn(d.ssn); return; } val = dg ? fmtSsn(dg) : null; }
         else if (i.getAttribute('data-n') === 'n') { val = val === '' ? 0 : parseInt(val.replace(/[^0-9\-]/g, ''), 10); if (isNaN(val)) { toast('숫자만 입력해 주세요'); return; } }
         else if (k === 'phone') val = val.replace(/[^0-9]/g, '');
-        else if (k === 'joined_at') { var dd = toDate(val); if (!dd) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); i.value = d.joined_at || ''; return; } val = dd; i.value = dd; }
+        else if (k === 'joined_at') { var dd = val === '' ? '' : toDate(val); if (dd == null) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); i.value = d.joined_at || ''; return; } val = dd || null; i.value = dd || ''; }
         else if (k !== 'name') val = val || null;
         upd[k] = val;
-        if (k === 'daily_fee') { upd.total_cost = calcTotal(val); upd.margin = calcMargin(upd.total_cost); }
-        else if (k === 'total_cost') upd.margin = calcMargin(val);
+        if (k === 'daily_fee') upd.total_cost = calcTotal(val);
+        if (['daily_fee', 'total_cost', 'chang_fee', 'insurance_cost', 'callmaner_cost'].indexOf(k) >= 0) { var nd = {}, q; for (q in d) nd[q] = d[q]; for (q in upd) nd[q] = upd[q]; upd.margin = calcMargin(nd.total_cost, nd.chang_fee, nd.insurance_cost, nd.callmaner_cost); }
         sb.from('golddriver_drivers').update(upd).eq('id', id).then(function (r) {
           if (r.error) { toast('저장 실패: ' + r.error.message); return; }
           for (var x in upd) d[x] = upd[x];
@@ -357,9 +378,60 @@
         });
       });
     });
+    $('#dadd', v).addEventListener('click', function () { addDriverModal(); });
     $('#dxl', v).addEventListener('click', function () { exportDriversXlsx(rows); });
     $('#dup', v).addEventListener('click', function () { $('#dfile', v).click(); });
     $('#dfile', v).addEventListener('change', function () { var f = this.files[0]; this.value = ''; if (f) importDrivers(f); });
+  }
+  function addDriverModal() {
+    sb.rpc('golddriver_next_emp_no').then(function (r) {
+      var m = $('#modal');
+      m.innerHTML = '<div class="mbox wide"><h3>기사 추가</h3><div class="mut">한 명씩 직접 입력해서 추가해요. 성명만 필수이고, 나머지는 나중에 표에서 고칠 수 있어요.</div>' +
+        '<div class="grid3"><div class="f"><label>가입일</label><input id="a-date" type="date" value="' + todayStr() + '"></div><div class="f"><label>상태</label><select id="a-st"><option>가입</option><option>퇴사</option><option>미납</option></select></div><div class="f"><label>사번</label><input id="a-emp" type="number" value="' + (r.data || '') + '"></div>' +
+        '<div class="f"><label>소속</label><input id="a-team" value="골드 2팀"></div><div class="f"><label>성명 *</label><input id="a-name"></div><div class="f"><label>주민번호</label><input id="a-ssn" placeholder="000000-0000000" maxlength="14" autocomplete="off"></div>' +
+        '<div class="f"><label>핸드폰 번호</label><input id="a-phone" inputmode="numeric" placeholder="010-0000-0000"></div><div class="f"><label>보험 회사명</label><input id="a-co"></div><div class="f"><label>보험 종류</label><input id="a-ins"></div>' +
+        '<div class="f"><label>입금 그룹명</label><input id="a-dep"></div><div class="f"><label>일비</label><input id="a-daily" type="number" inputmode="numeric"></div><div class="f"><label>실보험료</label><input id="a-real" type="number" inputmode="numeric" value="0"></div>' +
+        '<div class="f"><label>창 비용</label><input id="a-chang" type="number" inputmode="numeric" value="17000"></div><div class="f"><label>콜마너 비용</label><input id="a-cm" type="number" inputmode="numeric" value="0"></div><div class="f"><label>월 합산 비용 (일비×30)</label><input id="a-tot" type="number" value="0"></div>' +
+        '<div class="f"><label>순 마진 ((월합산−창비용−실보험료+콜마너)÷2)</label><input id="a-mar" type="number" value="0"></div></div>' +
+        '<div class="f"><label>비고</label><textarea id="a-note" rows="3" style="width:100%"></textarea></div>' +
+        '<div class="acts"><button class="btn" id="a-ok">추가</button><button class="btn line" id="a-no">취소</button></div></div>';
+      m.hidden = false; $('#a-name').focus();
+      var amar = function () { $('#a-mar').value = calcMargin($('#a-tot').value, $('#a-chang').value, $('#a-real').value, $('#a-cm').value); };
+      $('#a-daily').addEventListener('input', function () { $('#a-tot').value = calcTotal(this.value); amar(); });
+      ['#a-tot', '#a-chang', '#a-real', '#a-cm'].forEach(function (q) { $(q).addEventListener('input', amar); });
+      amar();
+      $('#a-ssn').addEventListener('input', function () { var d = this.value.replace(/[^0-9]/g, '').slice(0, 13); this.value = d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; });
+      $('#a-no').addEventListener('click', function () { m.hidden = true; });
+      $('#a-ok').addEventListener('click', function () {
+        var g = function (id) { return $(id).value.trim(); }, nm = g('#a-name');
+        if (!nm) { toast('성명을 입력해 주세요'); return; }
+        var ssn = g('#a-ssn').replace(/[^0-9]/g, ''); if (ssn && ssn.length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); return; }
+        var no = parseInt(g('#a-emp'), 10); if (isNaN(no)) { toast('사번을 입력해 주세요'); return; }
+        if (drivers.some(function (d) { return d.emp_no === no; })) { toast('이미 사용 중인 사번이에요'); return; }
+        var n = function (id) { return parseInt(g(id), 10) || 0; };
+        var rec = { emp_no: no, team: g('#a-team') || '골드 2팀', name: nm, ssn: ssn ? fmtSsn(ssn) : null, phone: g('#a-phone').replace(/[^0-9]/g, '') || null, ins_company: g('#a-co') || null, insurance: g('#a-ins') || null, deposit_group: g('#a-dep') || null,
+          status: g('#a-st'), joined_at: toDate(g('#a-date')), daily_fee: n('#a-daily'), insurance_cost: n('#a-real'), chang_fee: n('#a-chang'), callmaner_cost: n('#a-cm'), total_cost: n('#a-tot'), margin: n('#a-mar'), note: g('#a-note') || null };
+        this.disabled = true;
+        sb.from('golddriver_drivers').insert(rec).then(function (x) {
+          if (x.error) { toast('추가 실패: ' + (/duplicate/.test(x.error.message) ? '이미 사용 중인 사번이에요' : x.error.message), 5000); $('#a-ok').disabled = false; return; }
+          logAct(nm + ' 기사 수동 추가 (사번 ' + no + ')', null); m.hidden = true; toast(nm + ' 님을 추가했어요'); loadAll().then(render);
+        });
+      });
+    });
+  }
+  function noteModal(d, v) {
+    if (!d) return;
+    var m = $('#modal');
+    m.innerHTML = '<div class="mbox wide"><h3>' + esc(d.name) + ' 비고</h3><div class="f"><textarea id="n-t" rows="9" style="width:100%">' + esc(d.note || '') + '</textarea></div><div class="acts"><button class="btn" id="n-ok">저장</button><button class="btn line" id="n-no">닫기</button></div></div>';
+    m.hidden = false; $('#n-t').focus();
+    $('#n-no').addEventListener('click', function () { m.hidden = true; });
+    $('#n-ok').addEventListener('click', function () {
+      var t = $('#n-t').value.trim() || null; this.disabled = true;
+      sb.from('golddriver_drivers').update({ note: t }).eq('id', d.id).then(function (r) {
+        if (r.error) { toast('저장 실패: ' + r.error.message, 5000); $('#n-ok').disabled = false; return; }
+        d.note = t; logAct((d.name || '') + ' 기사 비고 수정', d.application_id); m.hidden = true; viewDrivers(v);
+      });
+    });
   }
   function deleteDrivers(list, all) {
     if (!list.length) return;
@@ -396,63 +468,85 @@
   }
   function toInt(x) { if (x == null || x === '') return null; var n = parseInt(String(x).replace(/[^0-9\-]/g, ''), 10); return isNaN(n) ? null : n; }
   function parseDriverSheet(buf) {
-    var wb = XLSX.read(buf, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+    var wb = XLSX.read(buf, { type: 'array', cellStyles: true });
+    var sn = wb.SheetNames.indexOf('명단') >= 0 ? '명단' : wb.SheetNames[0], ws = wb.Sheets[sn];
     var raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
-    if (!raw.length) return { rows: [], bad: 0 };
-    var head = raw[0].map(function (h) { return DALIAS[String(h).replace(/\s+/g, '')] || null; });
+    if (!raw.length) return { rows: [], bad: 0, sheet: sn };
+    var rng = XLSX.utils.decode_range(ws['!ref'] || 'A1'), r0 = rng.s.r, c0 = rng.s.c;
+    var nk = function (h) { return String(h).replace(/\s+/g, ''); };
+    var hi = -1, best = 0;
+    for (var i = 0; i < Math.min(raw.length, 20); i++) { var n = raw[i].filter(function (h) { return DALIAS[nk(h)]; }).length; if (n >= 4 && n > best) { best = n; hi = i; if (n >= 6) break; } }
+    if (hi < 0) return { rows: [], bad: 0, sheet: sn, hasHead: false };
+    var hdr = raw[hi], head = hdr.map(function (h) { return DALIAS[nk(h)] || null; });
+    var legacy = hdr.some(function (h) { return /^(월보험비용|일관리비|창비|천안콜마너비용)$/.test(nk(h)); });
+    var cell = function (ri, ci) { return ws[XLSX.utils.encode_cell({ r: ri + r0, c: ci + c0 })]; };
+    var yellow = function (c) { return c && c.s && c.s.patternType === 'solid' && c.s.fgColor && /^(FF)?FFFF00$/i.test(c.s.fgColor.rgb || ''); };
     var rows = [], bad = 0;
-    raw.slice(1).forEach(function (r) {
-      var o = {}, any = false;
-      head.forEach(function (k, i) { if (!k) return; var x = r[i]; if (x === '' || x == null) return; any = true; o[k] = x; });
-      if (!any) return;
-      if (!o.name) { bad++; return; }
+    for (var ri = hi + 1; ri < raw.length; ri++) {
+      var r = raw[ri], o = {}, any = false, memos = [], yel = false;
+      head.forEach(function (k, ci) {
+        var x = r[ci], cl = cell(ri, ci);
+        if (cl && cl.c && cl.c.length) cl.c.forEach(function (cm) {
+          var t = String(cm.t || '').replace(/\r\n?/g, '\n').replace(/^\s*[^\n:]{1,20}:\s*\n+/, '').trim();
+          if (t) memos.push(k === 'note' ? t : '[' + String(hdr[ci]).replace(/\s+/g, ' ').trim() + '] ' + t.replace(/\n+/g, ' '));
+        });
+        if (k === 'phone' && yellow(cl)) yel = true;
+        if (!k || x === '' || x == null) return; any = true; o[k] = x;
+      });
+      if (!any) continue;
+      if (!o.name) { if (o.phone || o.ssn) bad++; continue; }
+      if (memos.length) o.note = [o.note ? String(o.note).trim() : ''].concat(memos).filter(Boolean).join('\n');
+      if (legacy) {
+        var st = toInt(o.status), mg = toInt(o.margin);
+        o.status = st === 1 ? '가입' : yel ? '미납' : (mg ? '가입' : '퇴사'); delete o.margin;
+      } else if (o.status != null) { o.status = String(o.status).trim(); if (['가입', '퇴사', '미납'].indexOf(o.status) < 0) delete o.status; }
       rows.push(o);
-    });
-    return { rows: rows, bad: bad, hasHead: head.some(Boolean) };
+    }
+    return { rows: rows, bad: bad, hasHead: true, sheet: sn, legacy: legacy };
   }
   function importDrivers(file) {
     var fr = new FileReader();
     fr.onload = function () {
       var P; try { P = parseDriverSheet(new Uint8Array(fr.result)); } catch (e) { toast('엑셀 파일을 읽지 못했어요', 5000); return; }
-      if (!P.hasHead || !P.rows.length) { toast('가져올 기사 정보가 없어요. 첫 줄에 "성명, 사번…" 제목이 있는 파일인지 확인해 주세요.', 6000); return; }
+      if (!P.hasHead || !P.rows.length) { toast('가져올 기사 정보가 없어요. "성명, 사번…" 제목이 있는 파일인지 확인해 주세요.', 6000); return; }
       var byNo = {}; drivers.forEach(function (d) { byNo[d.emp_no] = d; });
-      var maxNo = drivers.reduce(function (s, d) { return Math.max(s, d.emp_no); }, 5325), used = {};
-      var plan = P.rows.map(function (o) {
-        var no = toInt(o.emp_no); if (no == null || used[no]) no = null;
+      var maxNo = drivers.reduce(function (s, d) { return Math.max(s, d.emp_no); }, 5325), used = {}, skip = 0, skipN = [];
+      var plan = [];
+      P.rows.forEach(function (o) {
+        var no = toInt(o.emp_no);
+        if (no != null && (byNo[no] || used[no])) { skip++; skipN.push(String(o.name).trim() + '(' + no + ')'); return; }
         if (no == null) { while (byNo[maxNo + 1] || used[maxNo + 1]) maxNo++; no = ++maxNo; }
         used[no] = 1; if (no > maxNo) maxNo = no;
-        return { no: no, o: o, old: byNo[no] || null };
+        plan.push({ no: no, o: o });
       });
-      var upd = plan.filter(function (p) { return p.old; }).length, add = plan.length - upd;
+      var add = plan.length, cnt = { 가입: 0, 퇴사: 0, 미납: 0 };
+      plan.forEach(function (p) { cnt[p.o.status || '가입']++; });
       var m = $('#modal');
-      m.innerHTML = '<div class="mbox"><h3>엑셀 업로드</h3><div class="mut">' + esc(file.name) + '</div><div style="margin:10px 0;line-height:1.7">새로 추가 <b>' + add + '명</b> · 기존 사번 수정 <b>' + upd + '명</b>' + (P.bad ? ' · 성명이 없어 건너뜀 ' + P.bad + '줄' : '') + '<br><span class="mut">사번이 비어 있으면 현재 마지막 사번 다음부터 순서대로 붙고, 같은 사번이 있으면 엑셀에 적힌 칸만 덮어써요. 비어 있는 칸은 기존 값을 유지해요.</span></div><div class="acts"><button class="btn" id="u-ok">반영하기</button><button class="btn line" id="u-no">취소</button></div></div>';
+      m.innerHTML = '<div class="mbox"><h3>엑셀 업로드</h3><div class="mut">' + esc(file.name) + ' · 시트 "' + esc(P.sheet) + '"' + (P.legacy ? ' (기존 명단 양식)' : '') + '</div><div style="margin:10px 0;line-height:1.7">새로 추가 <b>' + add + '명</b> <span class="mut">(가입 ' + cnt['가입'] + ' · 퇴사 ' + cnt['퇴사'] + ' · 미납 ' + cnt['미납'] + ')</span>' +
+        '<br>사번 중복으로 건너뜀 <b>' + skip + '명</b>' + (skip ? ' <span class="mut">' + esc(skipN.slice(0, 12).join(', ') + (skipN.length > 12 ? ' 외 ' + (skipN.length - 12) + '명' : '')) + '</span>' : '') + (P.bad ? ' · 성명이 없어 건너뜀 ' + P.bad + '줄' : '') + '<br><span class="mut">이미 있는 사번은 건드리지 않아요. 사번이 비어 있으면 마지막 사번 다음부터 붙어요. 가입일은 비워 둬요.</span></div><div class="acts"><button class="btn" id="u-ok"' + (add ? '' : ' disabled') + '>반영하기</button><button class="btn line" id="u-no">취소</button></div></div>';
       m.hidden = false;
       $('#u-no').addEventListener('click', function () { m.hidden = true; });
       $('#u-ok').addEventListener('click', function () {
         this.disabled = true;
         var recs = plan.map(function (p) {
-          var o = p.o, r = p.old ? JSON.parse(JSON.stringify(p.old)) : { team: '골드 2팀', joined_at: todayStr(), total_cost: 0, margin: 0, daily_fee: 0, insurance_cost: 0, callmaner_cost: 0, mgmt_fee: 0, chang_fee: 0, share_gongong: 0, share_byeonguk: 0, share_hyeongeun: 0 };
-          r.emp_no = p.no; r.name = String(o.name).trim();
+          var o = p.o, r = { emp_no: p.no, team: '골드 2팀', joined_at: null, status: o.status || '가입', name: String(o.name).trim(), ssn: null, phone: null, ins_company: null, insurance: null, deposit_group: null, note: null,
+            daily_fee: 0, insurance_cost: 0, chang_fee: 17000, callmaner_cost: 0, total_cost: 0, margin: 0 };
           ['team', 'ins_company', 'insurance', 'deposit_group', 'note'].forEach(function (k) { if (o[k] != null) r[k] = String(o[k]).trim() || null; });
           if (o.phone != null) r.phone = String(o.phone).replace(/[^0-9]/g, '') || null;
-          if (o.ssn != null) { var dg = String(o.ssn).replace(/[^0-9]/g, ''); if (dg.length === 12) dg = '0' + dg; r.ssn = dg.length === 13 ? fmtSsn(dg) : (r.ssn || null); }
-          if (o.joined_at != null) r.joined_at = toDate(o.joined_at) || r.joined_at;
-          ['daily_fee', 'insurance_cost', 'total_cost', 'margin', 'callmaner_cost'].forEach(function (k) { var n = toInt(o[k]); if (n != null) r[k] = n; });
-          if (o.daily_fee != null && o.total_cost == null) r.total_cost = calcTotal(r.daily_fee);
-          if ((o.daily_fee != null || o.total_cost != null) && o.margin == null) r.margin = calcMargin(r.total_cost);
-          delete r.created_at; delete r.updated_at;
+          if (o.ssn != null) { var dg = String(o.ssn).replace(/[^0-9]/g, ''); if (dg.length === 12) dg = '0' + dg; r.ssn = dg.length === 13 ? fmtSsn(dg) : null; }
+          if (o.joined_at != null) r.joined_at = toDate(o.joined_at);
+          ['daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin', 'callmaner_cost'].forEach(function (k) { var n = toInt(o[k]); if (n != null) r[k] = n; });
+          if (o.total_cost == null) r.total_cost = calcTotal(r.daily_fee);
+          if (o.margin == null) r.margin = calcMargin(r.total_cost, r.chang_fee, r.insurance_cost, r.callmaner_cost);
           return r;
         });
-        var news = recs.filter(function (r) { return !r.id; }), olds = recs.filter(function (r) { return r.id; });
-        var jobs = [];
-        if (olds.length) jobs.push(sb.from('golddriver_drivers').upsert(olds, { onConflict: 'id' }));
-        if (news.length) jobs.push(sb.from('golddriver_drivers').insert(news));
-        Promise.all(jobs).then(function (rs) {
-          var er = rs.filter(function (x) { return x.error; })[0];
-          if (er) { toast('반영 실패: ' + er.error.message, 6000); $('#u-ok').disabled = false; return; }
-          logAct('엑셀 업로드: 추가 ' + add + '명, 수정 ' + upd + '명 (' + file.name + ')', null);
-          m.hidden = true; toast('추가 ' + add + '명 · 수정 ' + upd + '명 반영했어요'); loadAll().then(render);
-        });
+        var parts = chunk(recs, 100);
+        parts.reduce(function (pr, part) { return pr.then(function () { return sb.from('golddriver_drivers').insert(part).then(function (x) { if (x.error) throw new Error(x.error.message); }); }); }, Promise.resolve())
+          .then(function () {
+            logAct('엑셀 업로드: 추가 ' + add + '명, 중복 건너뜀 ' + skip + '명 (' + file.name + ')', null);
+            m.hidden = true; toast('추가 ' + add + '명 반영 · 중복 ' + skip + '명 건너뜀'); return loadAll().then(render);
+          })
+          .catch(function (e) { toast('반영 실패: ' + e.message, 7000); var b = $('#u-ok'); if (b) b.disabled = false; });
       });
     };
     fr.readAsArrayBuffer(file);

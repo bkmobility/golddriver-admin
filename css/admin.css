@@ -88,7 +88,7 @@ td input.cell[data-k=ssn]{min-width:150px}td input.cell[data-k=phone]{min-width:
 
 /* 기사 가입 현황: 한 화면에 모두 보이게 + 가운데 정렬 */
 .dtw{overflow-x:auto}
-table.dt{table-layout:fixed;width:100%;min-width:1180px}
+table.dt{table-layout:fixed;width:100%;min-width:1230px}
 table.dt th,table.dt td{text-align:center;padding:8px 3px;overflow:hidden;text-overflow:ellipsis}
 table.dt th{font-size:12px}
 table.dt th.ck,table.dt td.ck{padding-right:3px}
@@ -106,3 +106,12 @@ a.callno:hover{background:var(--navy);color:var(--gold)}
 @media(max-width:760px){.claim td::before{content:none}.claim td.nl{padding:10px 0}}
 
 input.cell[data-k="phone"]{color:var(--navy);text-decoration:underline;text-underline-offset:3px;cursor:pointer}input.cell[data-k="phone"].ed{text-decoration:none;color:inherit;cursor:text}
+
+/* v1.4 상태·필터·비고 */
+select.cell.st{border:0;border-radius:999px;font-weight:700;font-size:12px;padding:4px 2px;width:100%;text-align:center;text-align-last:center;cursor:pointer;appearance:none;-webkit-appearance:none;background:#e8f7ee;color:#1a8a4a}
+select.cell.st-퇴사{background:#ececec;color:#777}select.cell.st-미납{background:#fff1b8;color:#9a6400}
+table.dt tr.fr th{padding:3px 2px;background:#fafbfd}
+.fi{width:100%;font-size:11px;padding:4px 2px;border:1px solid var(--line);border-radius:6px;text-align:center;background:#fff;min-width:0}
+td.nt{text-align:left!important}.note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;cursor:pointer;padding:5px 4px;border-radius:6px;border:1px solid transparent}.note:hover{border-color:var(--line);background:#fff}
+textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
+@media(max-width:760px){table.dt tr.fr{display:none}td.nt{text-align:right!important}.note{max-width:60%;white-space:normal}select.cell.st{width:auto;padding:4px 14px}}
