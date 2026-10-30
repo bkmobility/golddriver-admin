@@ -25,6 +25,8 @@
   function ymdhm(s) { var d = new Date(s); return ymd(s) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
   function fmtPhone(p) { p = String(p || ''); return p.length === 11 ? p.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : p.length === 10 ? p.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3') : p; }
   function age(b) { if (!b) return '-'; var d = new Date(b), n = new Date(), a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return a; }
+  function fno(n) { return n === 0 || n === '0' ? '0000' : n; }
+  function pno(t) { var g = String(t).replace(/[^0-9]/g, ''); return g === '' ? null : parseInt(g, 10); }
   function n0(v) { return Number(v || 0).toLocaleString('ko-KR'); }
   function appsText(a) { var o = []; for (var k in (a.selected_apps || {})) o.push(APPN[k] + ' ' + a.selected_apps[k]); return o.join(', ') || '-'; }
   function stTag(s) { var x = ST[s] || [s, '']; return '<span class="tag ' + x[1] + '">' + x[0] + '</span>'; }
@@ -325,7 +327,7 @@
   var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 보험회사명: 'ins_company', 보험회사: 'ins_company',
     보험종류: 'insurance', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 일관리비: 'daily_fee', 창비: 'chang_fee', 창비용: 'chang_fee', 상태: 'status', 유입경로: 'source', 천안콜마너비용: 'callmaner_cost', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
   var dq = '';
-  function dval(d, c) { var v = d[c[0]]; if (v == null) return ''; if (c[0] === 'phone') return fmtPhone(v); if (c[2] === 'n' && c[0] !== 'emp_no') return n0(v); return v; }
+  function dval(d, c) { var v = d[c[0]]; if (v == null) return ''; if (c[0] === 'emp_no') return fno(v); if (c[0] === 'phone') return fmtPhone(v); if (c[2] === 'n' && c[0] !== 'emp_no') return n0(v); return v; }
   function viewDrivers(v) {
     var rows = dRows();
     var sum = function (k) { return rows.reduce(function (s, d) { return s + (d[k] || 0); }, 0); };
@@ -393,7 +395,7 @@
         var k = i.getAttribute('data-k'), val = i.value.trim(), id = i.getAttribute('data-id'), upd = {};
         var d = drivers.filter(function (x) { return x.id === id; })[0];
         if (k === 'ssn') { var dg = val.replace(/[^0-9]/g, ''); if (dg && dg.length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); i.value = maskSsn(d.ssn); return; } val = dg ? fmtSsn(dg) : null; }
-        else if (k === 'emp_no') { var en = parseInt(val.replace(/[^0-9]/g, ''), 10); if (!en) { toast('사번은 숫자로 입력해 주세요'); i.value = d.emp_no; return; } if (drivers.some(function (x) { return x.id !== id && x.emp_no === en; })) { toast('이미 사용 중인 사번이에요'); i.value = d.emp_no; return; } val = en; }
+        else if (k === 'emp_no') { var en = pno(val); if (en == null) { toast('사번은 숫자로 입력해 주세요'); i.value = fno(d.emp_no); return; } if (en === 0 && (d.status || '가입') !== '퇴사') { toast('0000 사번은 퇴사자만 쓸 수 있어요'); i.value = fno(d.emp_no); return; } if (en !== 0 && drivers.some(function (x) { return x.id !== id && x.emp_no === en; })) { toast('이미 사용 중인 사번이에요'); i.value = fno(d.emp_no); return; } val = en; }
         else if (i.getAttribute('data-n') === 'n') { val = val === '' ? 0 : parseInt(val.replace(/[^0-9\-]/g, ''), 10); if (isNaN(val)) { toast('숫자만 입력해 주세요'); return; } }
         else if (k === 'phone') val = val.replace(/[^0-9]/g, '');
         else if (k === 'joined_at') { var dd = val === '' ? '' : toDate(val); if (dd == null) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); i.value = d.joined_at || ''; return; } val = dd || null; i.value = dd || ''; }
@@ -402,7 +404,7 @@
         if (k === 'daily_fee') upd.total_cost = calcTotal(val);
         if (['daily_fee', 'total_cost', 'chang_fee', 'insurance_cost', 'callmaner_cost'].indexOf(k) >= 0) { var nd = {}, q; for (q in d) nd[q] = d[q]; for (q in upd) nd[q] = upd[q]; upd.margin = calcMargin(nd.total_cost, nd.chang_fee, nd.insurance_cost, nd.callmaner_cost); }
         sb.from('golddriver_drivers').update(upd).eq('id', id).then(function (r) {
-          if (r.error) { toast('저장 실패: ' + (/duplicate/.test(r.error.message) ? '이미 사용 중인 사번이에요' : r.error.message)); if (k === 'emp_no') i.value = d.emp_no; return; }
+          if (r.error) { toast('저장 실패: ' + (/duplicate/.test(r.error.message) ? '이미 사용 중인 사번이에요' : r.error.message)); if (k === 'emp_no') i.value = fno(d.emp_no); return; }
           for (var x in upd) d[x] = upd[x];
           if (k === 'emp_no') { viewDrivers(v); return; }
           if (i.getAttribute('data-n') === 'n' && k !== 'emp_no') i.value = n0(d[k]);
@@ -425,12 +427,12 @@
   /* ---------- v2.0 공통: 필터 · 정렬 · 페이지 ---------- */
   function FILT_OK(k) { return k !== 'ssn' && k !== 'note'; }
   function dcol(k) { return DCOL.filter(function (x) { return x[0] === k; })[0] || ['license', '면허증']; }
-  function cstr(d, c) { var k = c[0]; if (k === 'license') return licPathOf(d) ? '등록됨' : '없음'; if (k === 'status') return d.status || '가입'; var x = d[k]; if (x == null || x === '') return ''; if (k === 'phone') return fmtPhone(x); if (c[2] === 'n' && k !== 'emp_no') return n0(x); return String(x); }
+  function cstr(d, c) { var k = c[0]; if (k === 'license') return licPathOf(d) ? '등록됨' : '없음'; if (k === 'status') return d.status || '가입'; var x = d[k]; if (x == null || x === '') return ''; if (k === 'emp_no') return String(fno(x)); if (k === 'phone') return fmtPhone(x); if (c[2] === 'n' && k !== 'emp_no') return n0(x); return String(x); }
   function dfCount() { return Object.keys(dfv).filter(function (k) { return dfv[k]; }).length; }
   function dRows() {
     var ks = Object.keys(dfv).filter(function (k) { return dfv[k]; }), ql = dq.toLowerCase();
     return drivers.filter(function (d) {
-      if (ql && (d.name + d.phone + d.emp_no + (d.team || '') + (d.deposit_group || '') + (d.ins_company || '')).toLowerCase().indexOf(ql) < 0) return false;
+      if (ql && (d.name + d.phone + d.emp_no + fno(d.emp_no) + (d.team || '') + (d.deposit_group || '') + (d.ins_company || '')).toLowerCase().indexOf(ql) < 0) return false;
       return ks.every(function (k) { return dfv[k].indexOf(cstr(d, dcol(k))) >= 0; });
     }).sort(dcmp);
   }
@@ -505,7 +507,7 @@
       '<div class="mmeta"><span>전체 <b>' + rows.length + '명</b> · <span class="mpill">순 마진 ' + n0(msum) + '원</span></span><select id="msort">' + MSORT.map(function (m) { return '<option value="' + m[0] + '"' + (sv === m[0] ? ' selected' : '') + '>' + m[1] + '</option>'; }).join('') + '</select></div>' +
       '<div class="mlist">' + shown.map(function (d) {
         var ph = String(d.phone || '').replace(/[^0-9]/g, '');
-        return '<div class="mcard" data-id="' + d.id + '"><div class="r1"><div class="av">' + esc((d.name || '?').charAt(0)) + '</div><div class="mnm"><div class="nm">' + esc(d.name) + ' <span class="pill st-' + esc(d.status || '가입') + '">' + esc(d.status || '가입') + '</span>' + (licPathOf(d) ? '' : '<span class="pill nolic">면허증 없음</span>') + '</div><div class="sub">사번 ' + d.emp_no + (d.source ? ' <span class="pill src">' + esc(d.source) + '</span>' : '') + '</div></div><div class="mgn"><span>순 마진</span><b>' + n0(d.margin) + '</b></div></div>' +
+        return '<div class="mcard" data-id="' + d.id + '"><div class="r1"><div class="av">' + esc((d.name || '?').charAt(0)) + '</div><div class="mnm"><div class="nm">' + esc(d.name) + ' <span class="pill st-' + esc(d.status || '가입') + '">' + esc(d.status || '가입') + '</span>' + (licPathOf(d) ? '' : '<span class="pill nolic">면허증 없음</span>') + '</div><div class="sub">사번 ' + fno(d.emp_no) + (d.source ? ' <span class="pill src">' + esc(d.source) + '</span>' : '') + '</div></div><div class="mgn"><span>순 마진</span><b>' + n0(d.margin) + '</b></div></div>' +
           '<div class="mcall">' + (ph ? '<a class="callb" href="tel:' + ph + '">📞 ' + fmtPhone(ph) + '</a>' : '<span class="callb off">전화번호 없음</span>') + '<button class="edb" data-id="' + d.id + '">✎</button></div></div>';
       }).join('') + (rows.length ? '' : '<div class="mut" style="padding:24px;text-align:center">조건에 맞는 기사가 없어요</div>') +
       (rows.length > dmore ? '<button class="btn dark mmore" id="mmore">더 보기 (남은 ' + (rows.length - dmore) + '명)</button>' : '') + '</div><button class="mfab" id="madd">＋</button>';
@@ -539,7 +541,7 @@
     var d = drivers.filter(function (x) { return x.id === id; })[0]; if (!d) return;
     var el = $('#medit'), F2 = [['status', '상태', 'sel'], ['joined_at', '가입일', 't'], ['emp_no', '사번', 'i'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 'ssn'], ['phone', '핸드폰', 'tel'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['callmaner_cost', '콜마너 비용', 'n'], ['total_cost', '월 합산 비용', 'ro'], ['margin', '순 마진', 'mg'], ['source', '유입 경로', 'src'], ['note', '비고', 'ta']];
     var ph = String(d.phone || '').replace(/[^0-9]/g, '');
-    el.innerHTML = '<div class="me"><div class="meh"><button id="me-back">‹</button><b>' + esc(d.name) + ' (' + d.emp_no + ')</b><span class="pill st-' + esc(d.status || '가입') + '">' + esc(d.status || '가입') + '</span></div><div class="meb"><div class="liccard"><div><b>운전면허증</b><span id="me-licst">' + (licPathOf(d) ? '등록됨' : '아직 등록되지 않았어요') + '</span></div><button class="btn sm" id="me-lic">' + (licPathOf(d) ? '보기 · 교체' : '＋ 등록') + '</button></div>' + F2.map(function (f) {
+    el.innerHTML = '<div class="me"><div class="meh"><button id="me-back">‹</button><b>' + esc(d.name) + ' (' + fno(d.emp_no) + ')</b><span class="pill st-' + esc(d.status || '가입') + '">' + esc(d.status || '가입') + '</span></div><div class="meb"><div class="liccard"><div><b>운전면허증</b><span id="me-licst">' + (licPathOf(d) ? '등록됨' : '아직 등록되지 않았어요') + '</span></div><button class="btn sm" id="me-lic">' + (licPathOf(d) ? '보기 · 교체' : '＋ 등록') + '</button></div>' + F2.map(function (f) {
       var k = f[0], val = d[k], t = f[2] || '', inp;
       if (t === 'sel') inp = '<select id="me-' + k + '">' + STS.map(function (x) { return '<option' + ((d.status || '가입') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>';
       else if (t === 'ta') inp = '<textarea id="me-' + k + '" rows="4">' + esc(val || '') + '</textarea>';
@@ -547,7 +549,7 @@
       else if (t === 'n') inp = '<input id="me-' + k + '" inputmode="numeric" value="' + n0(val) + '">';
       else if (t === 'ssn') inp = '<input id="me-' + k + '" value="' + esc(maskSsn(d.ssn)) + '" data-full="' + esc(fmtSsn(d.ssn)) + '" maxlength="14" autocomplete="off" placeholder="000000-0000000">';
       else if (t === 'tel') inp = '<input id="me-' + k + '" inputmode="tel" value="' + esc(fmtPhone(d.phone)) + '">';
-      else if (t === 'i') inp = '<input id="me-' + k + '" inputmode="numeric" value="' + esc(val == null ? '' : val) + '">';
+      else if (t === 'i') inp = '<input id="me-' + k + '" inputmode="numeric" value="' + esc(val == null ? '' : (k === 'emp_no' ? fno(val) : val)) + '">';
       else if (t === 't') inp = '<input id="me-' + k + '" inputmode="numeric" maxlength="10" placeholder="2026-10-28" value="' + esc(val || '') + '">';
       else inp = '<input id="me-' + k + '"' + (t === 'src' ? ' list="srcl"' : '') + ' value="' + esc(val == null ? '' : val) + '">';
       return '<div class="kvm' + (t === 'mg' ? ' mgrow' : '') + (t === 'ta' ? ' ta' : '') + '"><span>' + f[1] + '</span>' + inp + '</div>';
@@ -568,8 +570,9 @@
     $('#me-save').addEventListener('click', function () {
       var g = function (k) { return $('#me-' + k).value.trim(); }, btn = this, upd = {};
       var nm = g('name'); if (!nm) { toast('성명을 입력해 주세요'); return; }
-      var en = parseInt(g('emp_no').replace(/[^0-9]/g, ''), 10); if (!en) { toast('사번은 숫자로 입력해 주세요'); return; }
-      if (drivers.some(function (x) { return x.id !== d.id && x.emp_no === en; })) { toast('이미 사용 중인 사번이에요'); return; }
+      var en = pno(g('emp_no')); if (en == null) { toast('사번은 숫자로 입력해 주세요'); return; }
+      if (en === 0 && g('status') !== '퇴사') { toast('0000 사번은 퇴사자만 쓸 수 있어요'); return; }
+      if (en !== 0 && drivers.some(function (x) { return x.id !== d.id && x.emp_no === en; })) { toast('이미 사용 중인 사번이에요'); return; }
       var sd = ssn.value.replace(/[^0-9]/g, ''); if (document.activeElement !== ssn && ssn.getAttribute('data-full') != null && ssn.value.indexOf('*') >= 0) sd = ssn.getAttribute('data-full').replace(/[^0-9]/g, '');
       if (sd && sd.length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); return; }
       var jd = g('joined_at'), jv = jd === '' ? null : toDate(jd); if (jd !== '' && jv == null) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); return; }
@@ -655,7 +658,7 @@
   }
   function licModal(d, done) {
     var m = $('#modal'), p = licPathOf(d), own = !!d.license_path;
-    m.innerHTML = '<div class="mbox wide"><h3>' + esc(d.name) + ' (' + d.emp_no + ') 운전면허증</h3><div id="lm-body" class="mut">' + (p ? '불러오는 중…' : '') + '</div>' +
+    m.innerHTML = '<div class="mbox wide"><h3>' + esc(d.name) + ' (' + fno(d.emp_no) + ') 운전면허증</h3><div id="lm-body" class="mut">' + (p ? '불러오는 중…' : '') + '</div>' +
       (p ? '' : '<div class="drop" id="lm-drop"><div style="font-size:28px">🪪</div><b>사진을 끌어다 놓거나 선택</b><span>없으면 나중에 등록해도 돼요</span></div>') +
       '<div class="acts" id="lm-acts"><button class="btn sm line" id="lm-pick">' + (p ? '🔄 교체' : '🖼 사진 선택') + '</button><button class="btn sm line mcam" id="lm-cam">📷 촬영</button>' +
       (p ? '<a class="btn sm line" id="lm-dl" target="_blank" style="text-decoration:none" hidden>⬇ 열기/내려받기</a>' : '') + (own ? '<button class="btn sm red" id="lm-del">삭제</button>' : '') + '<button class="btn sm line" id="lm-no">닫기</button></div><div class="mut" id="lm-st"></div>' +
@@ -917,7 +920,7 @@
       var plan = [];
       P.rows.forEach(function (o) {
         var no = toInt(o.emp_no);
-        if (no != null && (byNo[no] || used[no])) { skip++; skipN.push(String(o.name).trim() + '(' + no + ')'); return; }
+        if (no != null && no !== 0 && (byNo[no] || used[no])) { skip++; skipN.push(String(o.name).trim() + '(' + no + ')'); return; }
         if (no == null) { while (byNo[maxNo + 1] || used[maxNo + 1]) maxNo++; no = ++maxNo; }
         used[no] = 1; if (no > maxNo) maxNo = no;
         plan.push({ no: no, o: o });
