@@ -305,13 +305,22 @@
   }
 
   /* ---------- 기사 가입 현황 ---------- */
-  var DCOL = [['joined_at', '가입일', 'd'], ['status', '상태', 't'], ['emp_no', '사번', 'n'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 's'], ['phone', '핸드폰 번호'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'],
+  var DCOL = [['joined_at', '가입일', 'd'], ['status', '상태', 't'], ['emp_no', '사번', 'n'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 's'], ['phone', '핸드폰 번호'], ['carrier', '통신사'], ['phone_owner', '명의'], ['programs', '설치 프로그램'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'],
     ['callmaner_cost', '콜마너 비용', 'n'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n'], ['source', '유입 경로'], ['note', '비고', 'm']];
   var SRC = ['블로그', '유튜브', '소개', '타타타', 'BK오더방', '이실장', '오우달', '새달사', '현근 영업', '지인'];
   var SRX = { '블로그': /블로그/g, '유튜브': /유튜브/g, '소개': /소개/g, '타타타': /타타타/g, 'BK오더방': /BK\s*오더방|오더방/g, '이실장': /이실장/g, '오우달': /오우달/g, '새달사': /새달사\s*쪽지|새달사/g, '현근 영업': /현근\s*영업|현근/g, '지인': /지인/g };
   function stripSrc(t, src) { var x = String(t || ''); if (src && SRX[src]) x = x.replace(SRX[src], ' '); x = x.replace(/\(\s*\)/g, ' ').replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim(); var m = /^\((.*)\)$/.exec(x); if (m) x = m[1].trim(); x = x.replace(/^[\s,·\/\-:]+|[\s,·\/\-:]+$/g, '').trim(); return x; }
   function detectSrc(t) { t = String(t || ''); var order = [['블로그', '블로그'], ['유튜브', '유튜브'], ['소개', '소개'], ['타타타', '타타타'], ['오더방', 'BK오더방'], ['이실장', '이실장'], ['오우달', '오우달'], ['새달사', '새달사'], ['현근', '현근 영업'], ['지인', '지인']]; for (var i = 0; i < order.length; i++) if (t.indexOf(order[i][0]) >= 0) return order[i][1]; return null; }
-  var DW = { joined_at: 6.8, status: 4.8, emp_no: 4, team: 4.8, name: 5, ssn: 8.5, phone: 8.5, ins_company: 5.5, insurance: 6.2, deposit_group: 9.2, callmaner_cost: 6.3, daily_fee: 5.5, insurance_cost: 6, chang_fee: 5, total_cost: 6.5, margin: 5.5, source: 6, note: 5 };
+  var DWP = { joined_at: 84, status: 62, emp_no: 56, team: 72, name: 94, ssn: 122, phone: 116, carrier: 84, phone_owner: 70, programs: 126, ins_company: 104, insurance: 100, deposit_group: 146, callmaner_cost: 96, daily_fee: 72, insurance_cost: 88, chang_fee: 78, total_cost: 104, margin: 78, source: 84, note: 88, license: 106 };
+  var DDEF = ['status', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'source', 'license'];
+  var DEXPD = ['status', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost'];
+  function allKeys() { return DCOL.map(function (c) { return c[0]; }).concat(['license']); }
+  var dvis = (function () { try { var a = JSON.parse(localStorage.getItem('gd_dvis') || 'null'); if (Array.isArray(a)) { a = a.filter(function (k) { return allKeys().indexOf(k) >= 0; }); if (a.length) return a; } } catch (e) {} return DDEF.slice(); })();
+  function saveVis() { try { localStorage.setItem('gd_dvis', JSON.stringify(dvis)); } catch (e) {} }
+  function visCols() { return DCOL.filter(function (c) { return dvis.indexOf(c[0]) >= 0; }); }
+  function isDefVis() { return dvis.length === DDEF.length && DDEF.every(function (k) { return dvis.indexOf(k) >= 0; }); }
+  function setOvf() { $$('.dtw').forEach(function (w) { var t = $('table.dt', w); if (!t) return; w.classList.remove('ovf'); if (t.scrollWidth > w.clientWidth + 1) w.classList.add('ovf'); }); }
+  window.addEventListener('resize', function () { setOvf(); });
   var dsort = { k: null, dir: 1 };
   function dcmp(a, b) {
     var k = dsort.k;
@@ -324,37 +333,37 @@
   }
   var dfv = {}, dfm = false, dpage = 1, dsize = 50, dmore = 50, dstatAll = false, STS = ['가입', '퇴사', '미납'];
   var dsel = {};
-  var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 보험회사명: 'ins_company', 보험회사: 'ins_company',
+  var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 통신사: 'carrier', 통신사정보: 'carrier', 명의: 'phone_owner', 설치프로그램: 'programs', 설치: 'programs', 보험회사명: 'ins_company', 보험회사: 'ins_company',
     보험종류: 'insurance', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 일관리비: 'daily_fee', 창비: 'chang_fee', 창비용: 'chang_fee', 상태: 'status', 유입경로: 'source', 천안콜마너비용: 'callmaner_cost', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
   var dq = '';
   function dval(d, c) { var v = d[c[0]]; if (v == null) return ''; if (c[0] === 'emp_no') return fno(v); if (c[0] === 'phone') return fmtPhone(v); if (c[2] === 'n' && c[0] !== 'emp_no') return n0(v); return v; }
   function viewDrivers(v) {
     var rows = dRows();
     var sum = function (k) { return rows.reduce(function (s, d) { return s + (d[k] || 0); }, 0); };
-    var dfN = dfCount(), fcnt = dfN + (dsort.k ? 1 : 0), DWT = 3 + 5.5 + DCOL.reduce(function (s, c) { return s + DW[c[0]]; }, 0);
+    var dfN = dfCount(), fcnt = dfN + (dsort.k ? 1 : 0), VC = visCols(), showLic = dvis.indexOf('license') >= 0, PX = 32 + (showLic ? DWP.license : 0) + VC.reduce(function (s, c) { return s + DWP[c[0]]; }, 0);
     var cntS = function (x) { return drivers.filter(function (d) { return (d.status || '가입') === x; }).length; };
     var per = dsize || rows.length || 1, pages = Math.max(1, Math.ceil(rows.length / per)); if (dpage > pages) dpage = pages;
     var vstart = dsize ? (dpage - 1) * per : 0, view = dsize ? rows.slice(vstart, vstart + per) : rows;
     var pagerHtml = pagerH(rows.length, pages, vstart, view.length), chipsHtml = chipsH();
     var selN = rows.filter(function (d) { return dsel[d.id]; }).length, allOn = rows.length > 0 && selN === rows.length;
     v.innerHTML = '<h2>기사 가입 현황 <span class="mut" style="font-size:14px">' + rows.length + '명</span></h2><div class="bar"><input type="search" id="dq" placeholder="이름·전화·사번·소속·보험사" value="' + esc(dq) + '"><button class="btn sm" id="dadd">+ 추가</button><button class="btn sm line" id="dxl">엑셀 다운로드</button><button class="btn sm line" id="dup">엑셀 업로드</button><input type="file" id="dfile" class="hid" accept=".xlsx,.xls,.csv"><span class="mut">셀을 눌러 바로 수정(전화번호는 누르면 전화, 길게 누르면 수정) · 제목을 누르면 정렬 </span></div>' +
-      '<div class="sumrow"><div class="sc kw"><span>총 인원</span><b>' + drivers.length + '명</b></div><div class="sc kg"><span>가입</span><b>' + cntS('가입') + '명</b></div><div class="sc ky"><span>퇴사</span><b>' + cntS('퇴사') + '명</b></div><div class="sc kr"><span>미납</span><b>' + cntS('미납') + '명</b></div><div class="sc main"><span>순 마진 합계' + (dfN || dq ? ' (필터 결과)' : '') + '</span><b>' + n0(sum('margin')) + '원</b></div><div class="sc"><span>월 합산 비용 합계</span><b>' + n0(sum('total_cost')) + '원</b></div></div>' +
-      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button>' + '<button class="btn sm dark" id="dfm">▾ 필터 · 정렬' + (fcnt ? ' (' + fcnt + ')' : '') + '</button></div>' + chipsHtml +
-      '<datalist id="srcl">' + SRC.map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist><div class="tw dtw"><table class="dt' + (dfm ? ' fm' : '') + '"><colgroup><col style="width:' + (300 / DWT).toFixed(2) + '%">' + DCOL.map(function (c) { return '<col style="width:' + (DW[c[0]] * 100 / DWT).toFixed(2) + '%">'; }).join('') + '<col style="width:' + (550 / DWT).toFixed(2) + '%"></colgroup><thead><tr><th class="ck"></th>' + DCOL.map(function (c) { var on = dsort.k === c[0]; return '<th class="sk" data-sk="' + c[0] + '">' + c[1] + (dfm && FILT_OK(c[0]) ? '<i class="fb' + (dfv[c[0]] ? ' on' : '') + '" data-fb="' + c[0] + '">▾</i>' : '') + '<i class="ar' + (on ? ' on' : '') + '">' + (on ? (dsort.dir > 0 ? '▲' : '▼') : '↕') + '</i></th>'; }).join('') + '<th class="lh">면허증' + (dfm ? '<i class="fb' + (dfv.license ? ' on' : '') + '" data-fb="license">▾</i>' : '') + '</th></tr></thead><tbody>' +
+      '<div class="sumrow"><div class="sc kw' + (!dfv.status ? ' on' : '') + '" data-st=""><span>총 인원</span><b>' + drivers.length + '명</b></div><div class="sc kg' + (dfv.status && dfv.status[0]==='가입' ? ' on' : '') + '" data-st="가입"><span>가입</span><b>' + cntS('가입') + '명</b></div><div class="sc ky' + (dfv.status && dfv.status[0]==='퇴사' ? ' on' : '') + '" data-st="퇴사"><span>퇴사</span><b>' + cntS('퇴사') + '명</b></div><div class="sc kr' + (dfv.status && dfv.status[0]==='미납' ? ' on' : '') + '" data-st="미납"><span>미납</span><b>' + cntS('미납') + '명</b></div><div class="sc main"><span>순 마진 합계' + (dfN || dq ? ' (필터 결과)' : '') + '</span><b>' + n0(sum('margin')) + '원</b></div><div class="sc"><span>월 합산 비용 합계</span><b>' + n0(sum('total_cost')) + '원</b></div></div>' +
+      '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="dselall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '명 선택됨</span><button class="btn sm red" id="dseldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button><button class="btn sm red" id="dalldel"' + (drivers.length ? '' : ' disabled') + '>전체 삭제</button>' + '<button class="btn sm dark" id="dfm">▾ 필터 · 정렬' + (fcnt ? ' (' + fcnt + ')' : '') + '</button><button class="btn sm dark" id="dcols">▦ 열 선택 (' + dvis.length + '/' + (DCOL.length + 1) + ')</button></div>' + chipsHtml +
+      '<datalist id="srcl">' + SRC.map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist><div class="tw dtw"><table class="dt' + (dfm ? ' fm' : '') + '" style="min-width:' + PX + 'px;width:100%"><colgroup><col style="width:32px">' + VC.map(function (c) { return '<col style="width:' + DWP[c[0]] + 'px">'; }).join('') + (showLic ? '<col style="width:' + DWP.license + 'px">' : '') + '</colgroup><thead><tr><th class="ck"></th>' + VC.map(function (c) { var on = dsort.k === c[0]; return '<th class="sk' + (c[0] === 'name' ? ' nm' : '') + '" data-sk="' + c[0] + '">' + c[1] + (dfm && FILT_OK(c[0]) ? '<i class="fb' + (dfv[c[0]] ? ' on' : '') + '" data-fb="' + c[0] + '">▾</i>' : '') + '<i class="ar' + (on ? ' on' : '') + '">' + (on ? (dsort.dir > 0 ? '▲' : '▼') : '↕') + '</i></th>'; }).join('') + (showLic ? '<th class="lh">면허증' + (dfm ? '<i class="fb' + (dfv.license ? ' on' : '') + '" data-fb="license">▾</i>' : '') + '</th>' : '') + '</tr></thead><tbody>' +
       view.map(function (d) {
-        return '<tr><td class="ck"><input type="checkbox" class="dk" data-id="' + d.id + '"' + (dsel[d.id] ? ' checked' : '') + '></td>' + DCOL.map(function (c) {
+        return '<tr><td class="ck"><input type="checkbox" class="dk" data-id="' + d.id + '"' + (dsel[d.id] ? ' checked' : '') + '></td>' + VC.map(function (c) {
           var val = dval(d, c), k = c[0], t = c[2];
           var cls = 'cell' + (t === 'n' ? ' num' : '');
           if (k === 'status') return '<td data-l="상태"><select class="cell st st-' + esc(d.status || '가입') + '" data-id="' + d.id + '" data-k="status">' + STS.map(function (x) { return '<option' + ((d.status || '가입') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></td>';
           if (k === 'source') return '<td data-l="유입 경로"><input class="cell" list="srcl" data-id="' + d.id + '" data-k="source" value="' + esc(d.source || '') + '"></td>';
           if (k === 'note') return '<td data-l="비고" class="nt"><div class="note" data-id="' + d.id + '" title="' + esc(d.note || '') + '">' + (d.note ? esc(d.note) : '<span class="mut">+ 메모</span>') + '</div></td>';
           if (k === 'phone') return '<td data-l="' + c[1] + '"><input class="cell" data-id="' + d.id + '" data-k="phone" value="' + esc(val) + '" readonly title="누르면 전화 · 길게 누르거나 더블클릭하면 수정"></td>';
-          if (k === 'name') return '<td data-l="성명"><b><input class="cell" data-id="' + d.id + '" data-k="name" value="' + esc(val) + '"></b></td>';
+          if (k === 'name') return '<td class="nm" data-l="성명"><b><input class="cell" data-id="' + d.id + '" data-k="name" value="' + esc(val) + '"></b></td>';
           if (k === 'ssn') return '<td data-l="주민번호"><input class="cell ssn" data-id="' + d.id + '" data-k="ssn" data-full="' + esc(fmtSsn(d.ssn)) + '" value="' + esc(maskSsn(d.ssn)) + '" maxlength="14" autocomplete="off" placeholder="000000-0000000"></td>';
           if (t === 'd') return '<td data-l="가입일"><input class="cell" type="text" inputmode="numeric" maxlength="10" data-id="' + d.id + '" data-k="' + k + '" data-n="d" placeholder="날짜 입력" value="' + esc(val) + '"></td>';
           return '<td data-l="' + c[1] + '"><input class="' + cls + '" data-id="' + d.id + '" data-k="' + k + '" data-n="' + (t || '') + '" value="' + esc(val) + '"' + '' + '></td>';
-        }).join('') + licTd(d) + '</tr>';
-      }).join('') + '</tbody><tfoot><tr class="tf"><td class="ck"></td>' + DCOL.map(function (c) { var k = c[0]; if (k === 'joined_at') return '<td><b>합계</b></td>'; if (['callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin'].indexOf(k) >= 0) return '<td><b>' + n0(sum(k)) + '</b></td>'; return '<td></td>'; }).join('') + '<td></td></tr></tfoot></table></div>' + pagerHtml + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">아직 기사가 없어요. 가입 신청에서 "가입 완료 처리"를 하면 아래에 순서대로 추가돼요.</div>');
+        }).join('') + (showLic ? licTd(d) : '') + '</tr>';
+      }).join('') + '</tbody><tfoot><tr class="tf"><td class="ck"></td>' + VC.map(function (c) { var k = c[0]; if (k === 'name') return '<td class="nm"><b>합계</b></td>'; if (k === 'joined_at') return '<td><b>합계</b></td>'; if (['callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin'].indexOf(k) >= 0) return '<td><b>' + n0(sum(k)) + '</b></td>'; return '<td></td>'; }).join('') + (showLic ? '<td></td>' : '') + '</tr></tfoot></table></div>' + pagerHtml + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">아직 기사가 없어요. 가입 신청에서 "가입 완료 처리"를 하면 아래에 순서대로 추가돼요.</div>');
     $$('.dk', v).forEach(function (c) { c.addEventListener('change', function () { if (c.checked) dsel[c.getAttribute('data-id')] = 1; else delete dsel[c.getAttribute('data-id')]; viewDrivers(v); }); });
     $('#dselall', v).addEventListener('change', function () { var on = this.checked; rows.forEach(function (d) { if (on) dsel[d.id] = 1; else delete dsel[d.id]; }); viewDrivers(v); });
     $('#dseldel', v).addEventListener('click', function () { deleteDrivers(rows.filter(function (d) { return dsel[d.id]; }), false); });
@@ -383,8 +392,10 @@
       var k = th.getAttribute('data-sk');
       if (dsort.k !== k) { dsort.k = k; dsort.dir = 1; } else if (dsort.dir === 1) dsort.dir = -1; else { dsort.k = null; dsort.dir = 1; }
       viewDrivers(v); }); });
+    $('#dcols', v).addEventListener('click', function (e) { e.stopPropagation(); colPicker(this, v); });
     $('#dfm', v).addEventListener('click', function () { dfm = !dfm; closePop(); viewDrivers(v); });
     $$('.fb', v).forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); var th = b.closest('th'); if ($('#dpop') && $('#dpop').getAttribute('data-k') === b.getAttribute('data-fb')) { closePop(); return; } openFPop(b.getAttribute('data-fb'), th, v); }); });
+    $$('.sc[data-st]', v).forEach(function (b) { b.addEventListener('click', function () { var t = b.getAttribute('data-st'); if (t) dfv.status = [t]; else delete dfv.status; dpage = 1; dsel = {}; viewDrivers(v); }); });
     $$('.fchip[data-x]', v).forEach(function (c) { c.addEventListener('click', function () { var k = c.getAttribute('data-x'); if (k === '_sort') dsort = { k: null, dir: 1 }; else delete dfv[k]; dpage = 1; dsel = {}; viewDrivers(v); }); });
     var fc = $('#dfclr', v); if (fc) fc.addEventListener('click', function () { dfv = {}; dsort = { k: null, dir: 1 }; dpage = 1; dsel = {}; viewDrivers(v); });
     $$('[data-pg]', v).forEach(function (b) { b.addEventListener('click', function () { dpage = parseInt(b.getAttribute('data-pg'), 10); viewDrivers(v); }); });
@@ -414,10 +425,11 @@
         });
       });
     });
-    var mgi = DCOL.map(function (c) { return c[0]; }).indexOf('margin') + 1;
-    $$('table.dt tr', v).forEach(function (tr) { if (tr.children[mgi]) tr.children[mgi].classList.add('mg'); });
-    var ams = ['callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin'].map(function (k) { return DCOL.map(function (c) { return c[0]; }).indexOf(k) + 1; });
-    $$('table.dt tr', v).forEach(function (tr) { ams.forEach(function (i) { if (tr.children[i]) tr.children[i].classList.add('am'); }); });
+    var vi = function (k) { var i = VC.map(function (c) { return c[0]; }).indexOf(k); return i < 0 ? -1 : i + 1; }, mgi = vi('margin');
+    $$('table.dt tr', v).forEach(function (tr) { if (mgi > 0 && tr.children[mgi]) tr.children[mgi].classList.add('mg'); });
+    var ams = ['callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin'].map(function (k) { return vi(k); });
+    $$('table.dt tr', v).forEach(function (tr) { ams.forEach(function (i) { if (i > 0 && tr.children[i]) tr.children[i].classList.add('am'); }); });
+    setOvf();
     $('#dadd', v).addEventListener('click', function (e) { e.stopPropagation(); toggleAddMenu($('#dadd', v)); });
     $$('.lcb', v).forEach(function (b) { b.addEventListener('click', function () { var d = drivers.filter(function (x) { return x.id === b.getAttribute('data-lic'); })[0]; if (d) licModal(d, function () { viewDrivers(v); }); }); });
     $('#dxl', v).addEventListener('click', function () { exportDriversXlsx(rows); });
@@ -452,6 +464,20 @@
       o += '<button class="pg" data-pg="' + Math.min(pages, dpage + 1) + '"' + (dpage === pages ? ' disabled' : '') + '>▶</button>';
     }
     return o + '<select id="dsz"><option value="50"' + (dsize === 50 ? ' selected' : '') + '>50명씩</option><option value="100"' + (dsize === 100 ? ' selected' : '') + '>100명씩</option><option value="0"' + (dsize === 0 ? ' selected' : '') + '>전체 보기 (' + total + '명)</option></select></div>';
+  }
+  function colPicker(btn, v) {
+    var old = $('#dpop'); if (old && old.getAttribute('data-k') === '_cols') { closePop(); return; }
+    closePop();
+    var pp = document.createElement('div'); pp.className = 'dpop cpick'; pp.id = 'dpop'; pp.setAttribute('data-k', '_cols');
+    var r = btn.getBoundingClientRect(); pp.style.top = (r.bottom + 4) + 'px'; pp.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 480)) + 'px';
+    var names = DCOL.map(function (c) { return [c[0], c[1]]; }).concat([['license', '면허증']]);
+    pp.innerHTML = '<div class="cph">표시할 열 <small>체크한 열만 보여요</small></div><div class="cpg">' + names.map(function (n) { return '<label><input type="checkbox" data-c="' + n[0] + '"' + (dvis.indexOf(n[0]) >= 0 ? ' checked' : '') + '> ' + n[1] + '</label>'; }).join('') + '</div><div class="pa"><button class="btn sm" data-def>기본값</button><button class="btn sm line" data-allc>모두 표시</button></div>';
+    document.body.appendChild(pp);
+    var apply = function () { closePop(); saveVis(); viewDrivers(v); var b2 = $('#dcols', v); if (b2) colPicker(b2, v); };
+    pp.addEventListener('change', function (e) { var t = e.target, k = t.getAttribute('data-c'); if (!k) return; var set = DCOL.map(function (c) { return c[0]; }).concat(['license']).filter(function (x) { return x === k ? t.checked : dvis.indexOf(x) >= 0; }); if (!set.length) { toast('하나 이상 선택해 주세요'); t.checked = true; return; } dvis = set; apply(); });
+    $('[data-def]', pp).addEventListener('click', function () { dvis = DDEF.slice(); apply(); });
+    $('[data-allc]', pp).addEventListener('click', function () { dvis = allKeys(); apply(); });
+    setTimeout(function () { var h = function (e) { var q = $('#dpop'); if (!q || q.contains(e.target) || e.target.closest('#dcols')) { if (!q) document.removeEventListener('mousedown', h); return; } closePop(); document.removeEventListener('mousedown', h); }; document.addEventListener('mousedown', h); }, 0);
   }
   function closePop() { var p = $('#dpop'); if (p) p.remove(); }
   document.addEventListener('mousedown', function (e) { var p = $('#dpop'); if (p && !p.contains(e.target) && !e.target.closest('.fb')) p.remove(); });
@@ -539,7 +565,7 @@
   }
   function mEdit(id, v) {
     var d = drivers.filter(function (x) { return x.id === id; })[0]; if (!d) return;
-    var el = $('#medit'), F2 = [['status', '상태', 'sel'], ['joined_at', '가입일', 't'], ['emp_no', '사번', 'i'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 'ssn'], ['phone', '핸드폰', 'tel'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['callmaner_cost', '콜마너 비용', 'n'], ['total_cost', '월 합산 비용', 'ro'], ['margin', '순 마진', 'mg'], ['source', '유입 경로', 'src'], ['note', '비고', 'ta']];
+    var el = $('#medit'), F2 = [['status', '상태', 'sel'], ['joined_at', '가입일', 't'], ['emp_no', '사번', 'i'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 'ssn'], ['phone', '핸드폰', 'tel'], ['carrier', '통신사'], ['phone_owner', '명의'], ['programs', '설치 프로그램'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['callmaner_cost', '콜마너 비용', 'n'], ['total_cost', '월 합산 비용', 'ro'], ['margin', '순 마진', 'mg'], ['source', '유입 경로', 'src'], ['note', '비고', 'ta']];
     var ph = String(d.phone || '').replace(/[^0-9]/g, '');
     el.innerHTML = '<div class="me"><div class="meh"><button id="me-back">‹</button><b>' + esc(d.name) + ' (' + fno(d.emp_no) + ')</b><span class="pill st-' + esc(d.status || '가입') + '">' + esc(d.status || '가입') + '</span></div><div class="meb"><div class="liccard"><div><b>운전면허증</b><span id="me-licst">' + (licPathOf(d) ? '등록됨' : '아직 등록되지 않았어요') + '</span></div><button class="btn sm" id="me-lic">' + (licPathOf(d) ? '보기 · 교체' : '＋ 등록') + '</button></div>' + F2.map(function (f) {
       var k = f[0], val = d[k], t = f[2] || '', inp;
@@ -577,7 +603,7 @@
       if (sd && sd.length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); return; }
       var jd = g('joined_at'), jv = jd === '' ? null : toDate(jd); if (jd !== '' && jv == null) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); return; }
       var total = tot(), cmp = {
-        status: g('status'), joined_at: jv, emp_no: en, team: g('team') || null, name: nm, ssn: sd ? fmtSsn(sd) : null, phone: g('phone').replace(/[^0-9]/g, '') || null, ins_company: g('ins_company') || null, insurance: g('insurance') || null, deposit_group: g('deposit_group') || null,
+        status: g('status'), joined_at: jv, emp_no: en, team: g('team') || null, name: nm, ssn: sd ? fmtSsn(sd) : null, phone: g('phone').replace(/[^0-9]/g, '') || null, ins_company: g('ins_company') || null, insurance: g('insurance') || null, deposit_group: g('deposit_group') || null, carrier: g('carrier') || null, phone_owner: g('phone_owner') || null, programs: g('programs') || null,
         daily_fee: num(g('daily_fee')), insurance_cost: num(g('insurance_cost')), chang_fee: num(g('chang_fee')), callmaner_cost: num(g('callmaner_cost')), total_cost: total, margin: calcMargin(total, g('chang_fee'), g('insurance_cost'), g('callmaner_cost')), source: g('source') || null, note: g('note') || null };
       for (var k in cmp) if ((cmp[k] == null ? '' : cmp[k]) !== (d[k] == null ? '' : d[k])) upd[k] = cmp[k];
       if (!Object.keys(upd).length) { close(); return; }
@@ -644,10 +670,11 @@
   /* ---------- v2.2 면허증 · 붙여넣기 추가 ---------- */
   function licPathOf(d) { if (d.license_path) return d.license_path; var a = apps.filter(function (x) { return x.id === d.application_id; })[0]; return a && a.license_path ? a.license_path : null; }
   function licTd(d) { var p = licPathOf(d); return '<td class="lc" data-l="면허증"><button class="lcb ' + (p ? 'ok' : 'no') + '" data-lic="' + d.id + '">' + (p ? '📷 등록됨' : '없음 ＋등록') + '</button></td>'; }
-  function compressImg(file) {
+  function compressImg(file, rot) {
+    rot = ((rot || 0) % 360 + 360) % 360;
     return new Promise(function (res, rej) {
       var url = URL.createObjectURL(file), img = new Image();
-      img.onload = function () { var k = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); cv.toBlob(function (b) { b ? res(b) : rej(new Error('img')); }, 'image/jpeg', 0.82); };
+      img.onload = function () { var k = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement('canvas'), w = Math.round(img.width * k), h = Math.round(img.height * k), sw = rot === 90 || rot === 270; cv.width = sw ? h : w; cv.height = sw ? w : h; var cx = cv.getContext('2d'); cx.translate(cv.width / 2, cv.height / 2); cx.rotate(rot * Math.PI / 180); cx.drawImage(img, -w / 2, -h / 2, w, h); URL.revokeObjectURL(url); cv.toBlob(function (b) { b ? res(b) : rej(new Error('img')); }, 'image/jpeg', 0.82); };
       img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('img')); }; img.src = url;
     });
   }
@@ -657,29 +684,46 @@
     return sb.storage.from('golddriver-licenses').upload(path, blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) { if (r.error) throw new Error(r.error.message); return path; });
   }
   function licModal(d, done) {
-    var m = $('#modal'), p = licPathOf(d), own = !!d.license_path;
+    var m = $('#modal'), p = licPathOf(d), own = !!d.license_path, rot = 0, pend = null, pendUrl = null, viewUrl = null;
     m.innerHTML = '<div class="mbox wide"><h3>' + esc(d.name) + ' (' + fno(d.emp_no) + ') 운전면허증</h3><div id="lm-body" class="mut">' + (p ? '불러오는 중…' : '') + '</div>' +
+      '<div class="rb" id="lm-rot" hidden><button class="btn sm line" id="lm-rl">↺ 왼쪽으로 회전</button><button class="btn sm line" id="lm-rr">↻ 오른쪽으로 회전</button></div><div class="mut" id="lm-rh" style="font-size:12px" hidden></div>' +
       (p ? '' : '<div class="drop" id="lm-drop"><div style="font-size:28px">🪪</div><b>사진을 끌어다 놓거나 선택</b><span>없으면 나중에 등록해도 돼요</span></div>') +
-      '<div class="acts" id="lm-acts"><button class="btn sm line" id="lm-pick">' + (p ? '🔄 교체' : '🖼 사진 선택') + '</button><button class="btn sm line mcam" id="lm-cam">📷 촬영</button>' +
+      '<div class="acts" id="lm-acts"><button class="btn sm" id="lm-save" hidden>저장</button><button class="btn sm line" id="lm-pick">' + (p ? '🔄 교체' : '🖼 사진 선택') + '</button><button class="btn sm line mcam" id="lm-cam">📷 촬영</button>' +
       (p ? '<a class="btn sm line" id="lm-dl" target="_blank" style="text-decoration:none" hidden>⬇ 열기/내려받기</a>' : '') + (own ? '<button class="btn sm red" id="lm-del">삭제</button>' : '') + '<button class="btn sm line" id="lm-no">닫기</button></div><div class="mut" id="lm-st"></div>' +
       '<input type="file" id="lm-f" class="hid" accept="image/*"><input type="file" id="lm-fc" class="hid" accept="image/*" capture="environment"></div>';
     m.hidden = false;
     var st = function (t) { $('#lm-st').textContent = t; };
     if (p) sb.storage.from('golddriver-licenses').createSignedUrl(p, 600).then(function (r) {
       var b = $('#lm-body'); if (!b) return;
-      if (r.data && r.data.signedUrl) { b.innerHTML = '<a href="' + r.data.signedUrl + '" target="_blank"><img class="lic" src="' + r.data.signedUrl + '"></a><div class="mut" style="font-size:12px">보안을 위해 이 사진 링크는 10분 후 만료돼요.</div>'; var dl = $('#lm-dl'); if (dl) { dl.href = r.data.signedUrl; dl.hidden = false; } }
+      if (r.data && r.data.signedUrl) { b.innerHTML = '<div class="rbox"><img class="lic" id="lm-img" src="' + r.data.signedUrl + '"></div><div class="mut" style="font-size:12px">보안을 위해 이 사진 링크는 10분 후 만료돼요.</div>'; viewUrl = r.data.signedUrl; $('#lm-rot').hidden = false; $('#lm-rh').hidden = false; $('#lm-rh').textContent = '돌린 뒤 「회전 저장」을 눌러야 바뀐 모습으로 저장돼요.'; var dl = $('#lm-dl'); if (dl) { dl.href = r.data.signedUrl; dl.hidden = false; } }
       else b.textContent = '사진을 불러오지 못했어요';
     });
+    function applyRot() {
+      var im = $('#lm-img'); if (!im) return; var q = rot % 180 !== 0;
+      im.style.transform = 'rotate(' + rot + 'deg)'; im.style.maxWidth = q ? '280px' : '100%'; im.style.maxHeight = q ? 'none' : '280px';
+      $('#lm-save').hidden = !(pend || rot); $('#lm-save').textContent = pend ? '저장' : '회전 저장';
+    }
+    function turn(dg) { rot = ((rot + dg) % 360 + 360) % 360; applyRot(); }
     function pick(file) {
-      if (!file) return; st('사진 줄이는 중…');
-      compressImg(file).then(function (blob) { st('올리는 중…'); return uploadLic(d, blob).then(function (path) {
+      if (!file) return; if (pendUrl) URL.revokeObjectURL(pendUrl);
+      pend = file; rot = 0; pendUrl = URL.createObjectURL(file); st('');
+      $('#lm-body').innerHTML = '<span class="tag">저장 전 · 미리보기</span><div class="rbox"><img class="lic" id="lm-img" src="' + pendUrl + '"></div>';
+      var dz0 = $('#lm-drop'); if (dz0) dz0.hidden = true; $('#lm-rot').hidden = false; $('#lm-rh').hidden = false; $('#lm-rh').textContent = '누를 때마다 90°씩 돌아가요. 지금 모습 그대로 저장돼요.'; applyRot(); $('#lm-save').hidden = false; $('#lm-save').textContent = '저장';
+    }
+    function save() {
+      var btn = $('#lm-save'); btn.disabled = true; st('사진 줄이는 중…');
+      var srcP = pend ? Promise.resolve(pend) : fetch(viewUrl).then(function (r) { if (!r.ok) throw new Error('사진을 불러오지 못했어요'); return r.blob(); });
+      srcP.then(function (src) { return compressImg(src, rot); }).then(function (blob) { st('올리는 중…'); return uploadLic(d, blob).then(function (path) {
         return sb.from('golddriver_drivers').update({ license_path: path }).eq('id', d.id).then(function (r) {
           if (r.error) throw new Error(r.error.message);
           var old = d.license_path; d.license_path = path;
           if (old) sb.storage.from('golddriver-licenses').remove([old]);
-          logAct((d.name || '') + ' 기사 운전면허증 ' + (p ? '교체' : '등록'), d.application_id); toast('면허증을 저장했어요'); m.hidden = true; if (done) done();
-        }); }); }).catch(function (e) { st('실패: ' + (e && e.message === 'img' ? '이 사진 형식은 열 수 없어요(JPG·PNG 사용)' : (e && e.message) || '다시 시도해 주세요')); });
+          logAct((d.name || '') + ' 기사 운전면허증 ' + (p ? (pend ? '교체' : '회전') : '등록'), d.application_id); toast('면허증을 저장했어요'); m.hidden = true; if (done) done();
+        }); }); }).catch(function (e) { btn.disabled = false; st('실패: ' + (e && e.message === 'img' ? '이 사진 형식은 열 수 없어요(JPG·PNG 사용)' : (e && e.message) || '다시 시도해 주세요')); });
     }
+    $('#lm-rl').addEventListener('click', function () { turn(-90); });
+    $('#lm-rr').addEventListener('click', function () { turn(90); });
+    $('#lm-save').addEventListener('click', save);
     $('#lm-pick').addEventListener('click', function () { $('#lm-f').click(); });
     $('#lm-cam').addEventListener('click', function () { $('#lm-fc').click(); });
     $('#lm-f').addEventListener('change', function () { pick(this.files[0]); this.value = ''; });
@@ -723,9 +767,9 @@
         else if (key.indexOf('종목') === 0 || key.indexOf('보험종류') === 0) { var pm = /^(.*?)\s*[(（](.*)[)）]\s*$/.exec(val); if (pm) { o.insurance = pm[1].trim(); o.extra.push('종목: ' + pm[2].trim()); } else o.insurance = val || null; }
         else if (key.indexOf('이름') === 0 || key.indexOf('성명') === 0) o.name = val;
         else if (key.indexOf('핸드폰') === 0 || key.indexOf('휴대폰') === 0 || key.indexOf('전화') === 0) o.phone = val.replace(/[^0-9]/g, '') || null;
-        else if (key.indexOf('통신사') === 0) { if (val) o.extra.push('통신사: ' + val); }
-        else if (key.indexOf('본인') === 0 || key.indexOf('명의') === 0) { if (val) o.extra.push('명의: ' + val); }
-        else if (key.indexOf('설치') === 0) { if (val) o.extra.push('설치 프로그램: ' + val); }
+        else if (key.indexOf('통신사') === 0) { if (val) o.carrier = val; }
+        else if (key.indexOf('본인') === 0 || key.indexOf('명의') === 0) { if (val) o.phone_owner = /타인/.test(val) && !/본인/.test(val) ? '타인' : (/본인/.test(val) && !/타인/.test(val) ? '본인' : val); }
+        else if (key.indexOf('설치') === 0) { if (val) o.programs = val; }
         else if (key.indexOf('일비') === 0) { o.daily = money9(val); if (val && !/^[\d,\s]+원?$/.test(val)) o.extra.push('일비: ' + val); }
         else if (key.indexOf('가입경로') === 0 || key.indexOf('유입경로') === 0) o.source = val ? (detectSrc(val) || val) : null;
         else if (key.indexOf('비고') === 0) { inNote = true; if (val) o.note.push(val); }
@@ -736,7 +780,7 @@
     var all = o.extra.concat(o.note); o.noteText = all.length ? all.join('\n') : null; return o;
   }
   function pasteModal() {
-    var m = $('#modal'), file = null, thumbUrl = null;
+    var m = $('#modal'), file = null, thumbUrl = null, srcF = null, prot = 0;
     m.innerHTML = '<div class="mbox xwide"><h3>붙여넣기로 추가 <button class="x2" id="pp-x">✕</button></h3><div class="pcols">' +
       '<div><div class="lab">붙여넣기 <span>(한 명씩)</span></div><textarea id="pp-t" rows="12" placeholder="여기에 붙여넣기&#10;&#10;■ 골드2팀&#10;1. 가입일 : 26-10-28&#10;2. 종목 : 월보험 탁송&#10;3. 이름 : 홍길동&#10;4. 핸드폰 번호 : 010-0000-0000 …"></textarea><div class="acts"><button class="btn sm line" id="pp-clip">📋 클립보드에서 붙여넣기</button><button class="btn sm line" id="pp-clr">지우기</button></div></div>' +
       '<div><div class="lab">이렇게 인식했어요</div><div class="res" id="pp-res"><span class="mut">붙여넣으면 여기에 항목별로 보여드려요</span></div></div>' +
@@ -749,7 +793,7 @@
     function refresh() {
       var t = $('#pp-t').value; cur = parsePaste(t); var o = cur, ok = !!(t.trim() && o.name);
       $('#pp-res').innerHTML = t.trim() ? ('<h5>' + (o.name ? '✓ 추가 전에 확인하세요' : '⚠ 이름을 찾지 못했어요') + '</h5>' +
-        row('가입일', o.joined_at, !o.joined_at) + row('상태 · 소속', '가입 · ' + (o.team || '골드2팀')) + row('성명', o.name, !o.name) + row('핸드폰', o.phone ? fmtPhone(o.phone) : '', !o.phone) + row('보험 종류', o.insurance, !o.insurance) + row('일비', n0(o.daily), !o.daily) + row('유입 경로', o.source, !o.source) + row('사번', '자동 부여') + row('보험사·입금그룹·주민번호', '', true) + row('비고', (o.noteText || '').replace(/\n/g, ' · '), !o.noteText)) : '<span class="mut">붙여넣으면 여기에 항목별로 보여드려요</span>';
+        row('가입일', o.joined_at, !o.joined_at) + row('상태 · 소속', '가입 · ' + (o.team || '골드2팀')) + row('성명', o.name, !o.name) + row('핸드폰', o.phone ? fmtPhone(o.phone) : '', !o.phone) + row('통신사', o.carrier, !o.carrier) + row('명의', o.phone_owner, !o.phone_owner) + row('설치 프로그램', o.programs, !o.programs) + row('보험 종류', o.insurance, !o.insurance) + row('일비', n0(o.daily), !o.daily) + row('유입 경로', o.source, !o.source) + row('사번', '자동 부여') + row('보험사·입금그룹·주민번호', '', true) + row('비고', (o.noteText || '').replace(/\n/g, ' · '), !o.noteText)) : '<span class="mut">붙여넣으면 여기에 항목별로 보여드려요</span>';
       $('#pp-ok').disabled = !ok; $('#pp-ok').textContent = ok ? '추가 (' + o.name + ')' : '추가';
     }
     $('#pp-t').addEventListener('input', refresh);
@@ -757,7 +801,7 @@
     $('#pp-clip').addEventListener('click', function () { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (x) { $('#pp-t').value = x; refresh(); }).catch(function () { toast('붙여넣기 칸을 길게 눌러 직접 붙여넣어 주세요'); }); else toast('붙여넣기 칸을 길게 눌러 직접 붙여넣어 주세요'); });
     function setFile(f) {
       if (!f) return; $('#pp-st').textContent = '사진 줄이는 중…';
-      compressImg(f).then(function (b) { file = b; if (thumbUrl) URL.revokeObjectURL(thumbUrl); thumbUrl = URL.createObjectURL(b); $('#pp-st').textContent = ''; $('#pp-thumb').innerHTML = '<div class="thumb"><img src="' + thumbUrl + '"><div><b>' + esc(f.name || '면허증') + '</b><span>' + fmtSize(b.size) + ' · 올렸어요</span></div><button class="lk" id="pp-rm">삭제</button></div>'; $('#pp-rm').addEventListener('click', function () { file = null; $('#pp-thumb').innerHTML = ''; }); })
+      compressImg(f).then(function (b) { file = b; srcF = f; prot = 0; if (thumbUrl) URL.revokeObjectURL(thumbUrl); thumbUrl = URL.createObjectURL(b); $('#pp-st').textContent = ''; $('#pp-thumb').innerHTML = '<div class="thumb"><img id="pp-img" src="' + thumbUrl + '"><div><b>' + esc(f.name || '면허증') + '</b><span>' + fmtSize(b.size) + ' · 올렸어요</span></div><button class="lk" id="pp-rm">삭제</button></div><div class="rb"><button class="btn sm line" id="pp-rl" type="button">↺ 왼쪽으로 회전</button><button class="btn sm line" id="pp-rr" type="button">↻ 오른쪽으로 회전</button></div><div class="mut" style="font-size:12px">누를 때마다 90°씩 돌아가요. 지금 모습 그대로 등록돼요.</div>'; $('#pp-rm').addEventListener('click', function () { file = null; srcF = null; prot = 0; $('#pp-thumb').innerHTML = ''; }); var tn = function (dg) { prot = ((prot + dg) % 360 + 360) % 360; $('#pp-img').style.transform = 'rotate(' + prot + 'deg)'; }; $('#pp-rl').addEventListener('click', function () { tn(-90); }); $('#pp-rr').addEventListener('click', function () { tn(90); }); })
         .catch(function () { $('#pp-st').textContent = '이 사진 형식은 열 수 없어요(JPG·PNG 사용)'; });
     }
     $('#pp-pick').addEventListener('click', function () { $('#pp-f').click(); });
@@ -772,14 +816,14 @@
         var no = parseInt(r.data, 10) || (drivers.reduce(function (mx, d) { return Math.max(mx, d.emp_no); }, 5000) + 1);
         while (drivers.some(function (d) { return d.emp_no === no; })) no++;
         var id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r2 = Math.random() * 16 | 0; return (c === 'x' ? r2 : (r2 & 3 | 8)).toString(16); });
-        var tot = calcTotal(o.daily), rec = { id: id, emp_no: no, team: o.team || '골드2팀', name: o.name, ssn: null, phone: o.phone, ins_company: null, insurance: o.insurance, deposit_group: null, status: '가입', joined_at: o.joined_at, daily_fee: o.daily, insurance_cost: 0, chang_fee: 17000, callmaner_cost: 0, total_cost: tot, margin: calcMargin(tot, 17000, 0, 0), source: o.source, note: o.noteText };
+        var tot = calcTotal(o.daily), rec = { id: id, emp_no: no, team: o.team || '골드2팀', name: o.name, ssn: null, phone: o.phone, ins_company: null, insurance: o.insurance, deposit_group: null, status: '가입', joined_at: o.joined_at, daily_fee: o.daily, insurance_cost: 0, chang_fee: 17000, callmaner_cost: 0, total_cost: tot, margin: calcMargin(tot, 17000, 0, 0), source: o.source, note: o.noteText }; if (o.carrier) rec.carrier = o.carrier; if (o.phone_owner) rec.phone_owner = o.phone_owner; if (o.programs) rec.programs = o.programs;
         return sb.from('golddriver_drivers').insert(rec).then(function (x) {
           if (x.error) { toast('추가 실패: ' + x.error.message, 5000); btn.disabled = false; $('#pp-st').textContent = ''; return; }
           logAct(o.name + ' 기사 붙여넣기 추가 (사번 ' + no + ')', null);
           var fin = function (msg) { m.hidden = true; toast(msg, 4500); loadAll().then(render); };
           if (!file) { fin(o.name + ' 님을 추가했어요 (사번 ' + no + ') · 면허증은 나중에 등록할 수 있어요'); return; }
           $('#pp-st').textContent = '면허증 올리는 중…';
-          uploadLic(rec, file).then(function (path) { return sb.from('golddriver_drivers').update({ license_path: path }).eq('id', id).then(function (u) { if (u.error) throw new Error(u.error.message); fin(o.name + ' 님과 면허증을 추가했어요 (사번 ' + no + ')'); }); })
+          (prot ? compressImg(srcF, prot) : Promise.resolve(file)).then(function (fb) { return uploadLic(rec, fb); }).then(function (path) { return sb.from('golddriver_drivers').update({ license_path: path }).eq('id', id).then(function (u) { if (u.error) throw new Error(u.error.message); fin(o.name + ' 님과 면허증을 추가했어요 (사번 ' + no + ')'); }); })
             .catch(function () { fin(o.name + ' 님은 추가했지만 면허증 올리기는 실패했어요. 표에서 다시 등록해 주세요'); });
         });
       });
@@ -858,9 +902,10 @@
     });
   }
   function exportDriversXlsx(rows) {
-    var head = DCOL.map(function (c) { return c[1]; });
-    var data = [head].concat(rows.map(function (d) { return DCOL.map(function (c) { var x = c[0] === 'ssn' ? fmtSsn(d.ssn) : (c[2] === 'n' ? (d[c[0]] == null ? '' : d[c[0]]) : dval(d, c)); return x; }); }));
-    var ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = DCOL.map(function (c) { return { wch: Math.max(10, c[1].length * 2 + 2) }; });
+    var keys = isDefVis() ? DEXPD : dvis, EC = DCOL.filter(function (c) { return keys.indexOf(c[0]) >= 0; }), wl = keys.indexOf('license') >= 0;
+    var head = EC.map(function (c) { return c[1]; }).concat(wl ? ['면허증'] : []);
+    var data = [head].concat(rows.map(function (d) { return EC.map(function (c) { var x = c[0] === 'ssn' ? fmtSsn(d.ssn) : (c[2] === 'n' ? (d[c[0]] == null ? '' : d[c[0]]) : dval(d, c)); return x; }).concat(wl ? [licPathOf(d) ? '등록됨' : '없음'] : []); }));
+    var ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = EC.concat(wl ? [['license', '면허증']] : []).map(function (c) { return { wch: Math.max(10, c[1].length * 2 + 2) }; });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '기사 가입 현황');
     XLSX.writeFile(wb, '기사가입현황_' + ymd(new Date()) + '.xlsx');
   }
@@ -937,7 +982,7 @@
         var recs = plan.map(function (p) {
           var o = p.o, r = { emp_no: p.no, team: '골드 2팀', joined_at: null, status: o.status || '가입', name: String(o.name).trim(), ssn: null, phone: null, ins_company: null, insurance: null, deposit_group: null, note: null, source: null,
             daily_fee: 0, insurance_cost: 0, chang_fee: 17000, callmaner_cost: 0, total_cost: 0, margin: 0 };
-          ['team', 'ins_company', 'insurance', 'deposit_group', 'note', 'source'].forEach(function (k) { if (o[k] != null) r[k] = String(o[k]).trim() || null; });
+          ['team', 'ins_company', 'insurance', 'deposit_group', 'note', 'source', 'carrier', 'phone_owner', 'programs'].forEach(function (k) { if (o[k] != null) { var tv = String(o[k]).trim() || null; if (tv || ['carrier', 'phone_owner', 'programs'].indexOf(k) < 0) r[k] = tv; } });
           if (o.phone != null) r.phone = String(o.phone).replace(/[^0-9]/g, '') || null;
           if (o.ssn != null) { var dg = String(o.ssn).replace(/[^0-9]/g, ''); if (dg.length === 12) dg = '0' + dg; r.ssn = dg.length === 13 ? fmtSsn(dg) : null; }
           if (o.joined_at != null) r.joined_at = toDate(o.joined_at);

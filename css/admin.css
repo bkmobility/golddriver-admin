@@ -257,3 +257,33 @@ table.dt th.lh{background:#ffefb5;color:#7a5200}table.dt td.lc{padding:4px 2px}
  .pill.nolic{background:#fff1b8;color:#9a6400}
  .modalbg:has(.xwide){align-items:flex-end;padding:0}.modalbg:has(.xwide) .mbox{border-radius:18px 18px 0 0}
 }
+
+/* v2.3 */
+.sc[data-st]{cursor:pointer;transition:transform .1s}.sc[data-st]:hover{transform:translateY(-2px)}
+.sc.on{box-shadow:0 0 0 3px rgba(18,32,74,.35)}
+.sc[data-st]::after{content:"눌러서 보기";font-size:9px;color:#7a869f;margin-top:1px}
+.sc.on::after{content:"✔ 보는 중";font-weight:700}
+/* 표 제목줄 고정 + 열이 넘치면 하단 스크롤 (v2.4) */
+@media(min-width:761px){
+ .dtw{overflow:visible;overflow-x:clip}
+ table.dt thead th,table.dt thead th.sk,table.dt thead th.lh{position:sticky;top:54px;z-index:4;box-shadow:0 2px 0 var(--line)}
+ table.dt.fm th .fb{position:absolute}
+ .dtw.ovf{overflow:scroll;max-height:calc(100vh - 66px);position:sticky;top:56px;z-index:3}
+ .dtw.ovf table.dt thead th{top:0}
+ table.dt th.ck,table.dt td.ck{position:sticky;left:0;z-index:5;background:#fff}
+ table.dt thead th.ck{z-index:7;background:#f0f2f7}
+ table.dt td.nm{position:sticky;left:32px;z-index:5;background:#fff;box-shadow:2px 0 0 var(--line)}
+ table.dt thead th.nm{left:32px;z-index:7;box-shadow:2px 0 0 var(--line)}
+ table.dt tfoot td.nm,table.dt tfoot td.ck{background:#fafbfd}
+ .dtw.ovf::-webkit-scrollbar{height:14px;width:14px}.dtw.ovf::-webkit-scrollbar-track{background:#e3e8f3}.dtw.ovf::-webkit-scrollbar-thumb{background:#12204a;border-radius:8px;border:3px solid #e3e8f3}
+}
+.cpick{width:470px;max-width:calc(100vw - 16px)}
+.cph{font-weight:800;color:var(--navy);margin:2px 4px 8px}.cph small{font-weight:400;color:var(--mut);margin-left:6px}
+.cpick .cpg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 8px;padding:0 4px 8px}
+.cpick .cpg label{display:flex;gap:6px;align-items:center;white-space:nowrap;cursor:pointer;font-size:13px}.cpick .cpg input{width:16px;height:16px;padding:0;accent-color:var(--navy)}
+/* 사진 회전 */
+.rb{display:flex;gap:8px;margin:8px 0}.rb .btn{flex:1;border:2px solid var(--navy);font-weight:800}
+.rbox{height:300px;background:#111;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.rbox img.lic{margin:0;border:0;width:auto;max-width:100%;max-height:280px;object-fit:contain;transition:transform .2s}
+.tag{display:inline-block;background:#fff6dc;border:1px solid #f0b400;color:#8a6100;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;margin-bottom:6px}
+.thumb img{transition:transform .2s}
