@@ -92,7 +92,7 @@
     var v = $('#view'), bn = $('#bnav'), mm = isM();
     bn.innerHTML = BNAV.map(function (t) { var on = tab === t[0] || (t[0] === 'more' && (tab === 'stats' || tab === 'log' || tab === 'claim')); return '<button data-b="' + t[0] + '" class="' + (on ? 'on' : '') + '"><i>' + t[2] + '</i>' + t[1] + (t[0] === 'apps' && badge ? '<span class="dot">' + badge + '</span>' : '') + '</button>'; }).join('');
     $$('#bnav button').forEach(function (b) { b.addEventListener('click', function () { tab = b.getAttribute('data-b'); window.scrollTo(0, 0); render(); }); });
-    $('#main').classList.toggle('mfull', mm && (tab === 'drivers' || tab === 'stats' || tab === 'more'));
+    $('#main').classList.toggle('mfull', mm && (tab === 'drivers' || tab === 'stats' || tab === 'more')); $('#main').classList.toggle('wide', tab === 'drivers');
     if (tab === 'more' && !mm) tab = 'home';
     ({ home: viewHome, apps: viewApps, drivers: mm ? viewDriversM : viewDrivers, stats: viewStats, more: viewMore, pay: viewPay, log: viewLog, claim: viewClaim })[tab](v);
   }
@@ -273,6 +273,7 @@
       m.innerHTML = '<div class="mbox wide"><h3>가입 완료 처리</h3><div class="mut">' + esc(a.name) + ' 님을 기사 가입 현황에 등록합니다. 신청 상태는 "가입 완료"로 바뀝니다. 모든 칸은 나중에도 수정할 수 있어요.</div>' +
         '<div class="grid3"><div class="f"><label>가입일</label><input id="r-date" type="date" value="' + todayStr() + '"></div><div class="f"><label>사번</label><input id="r-emp" type="number" value="' + (r.data || '') + '"></div><div class="f"><label>소속</label><input id="r-team" value="골드 2팀"></div>' +
         '<div class="f"><label>성명</label><input id="r-name" value="' + esc(a.name) + '"></div><div class="f"><label>주민번호</label><input id="r-ssn" placeholder="000000-0000000" maxlength="14" autocomplete="off"><div class="ocr" id="r-ocr"></div></div><div class="f"><label>핸드폰 번호</label><input id="r-phone" value="' + esc(fmtPhone(a.phone)) + '"></div>' +
+        '<div class="f"><label>통신사 <small class="auto">신청서</small></label><input id="r-car" value="' + esc(CAR[a.carrier] || '') + '"></div><div class="f"><label>명의 <small class="auto">신청서</small></label><input id="r-own" value="' + (a.phone_owner === 'other' ? '타인' : a.phone_owner === 'self' ? '본인' : '') + '"></div><div class="f"><label>설치 프로그램 <small class="auto">신청서</small></label><input id="r-prog" value="' + esc(Object.keys(a.selected_apps || {}).filter(function (k) { return a.selected_apps[k] > 0 && /^(logi|callmaner|aicon)$/.test(k); }).map(function (k) { return APPN[k] + ' ' + a.selected_apps[k]; }).join(', ')) + '"></div>' +
         '<div class="f"><label>보험 회사명</label><input id="r-co"></div><div class="f"><label>보험 종류</label><input id="r-ins" value="' + ins + '"></div><div class="f"><label>입금 그룹명</label><input id="r-dep"></div>' +
         '<div class="f"><label>일비</label><input id="r-daily" type="number" inputmode="numeric" value=""></div><div class="f"><label>실보험료</label><input id="r-real" type="number" inputmode="numeric" value="0"></div><div class="f"><label>창 비용</label><input id="r-chang" type="number" inputmode="numeric" value="17000"></div>' +
         '<div class="f"><label>콜마너 비용</label><input id="r-cm" type="number" inputmode="numeric" value="0"></div><div class="f"><label>월 합산 비용 (일비×30)</label><input id="r-tot" type="number" value="0"></div><div class="f"><label>순 마진 ((월합산−창비용−실보험료+콜마너)÷2)</label><input id="r-mar" type="number" value="0"></div></div>' +
@@ -291,7 +292,7 @@
       } else { $('#r-ocr').textContent = '운전면허증이 아직 없어요. 받으면 직접 입력하거나 나중에 표에서 입력하세요.'; }
       $('#r-ok').addEventListener('click', function () {
         var n = function (id) { return $(id).value.replace(/,/g, '').trim(); };
-        var p = { joined_at: n('#r-date'), emp_no: n('#r-emp'), team: n('#r-team'), name: n('#r-name'), ssn: n('#r-ssn'), phone: n('#r-phone'), ins_company: n('#r-co'), insurance: n('#r-ins'), deposit_group: n('#r-dep'),
+        var p = { joined_at: n('#r-date'), emp_no: n('#r-emp'), team: n('#r-team'), name: n('#r-name'), ssn: n('#r-ssn'), phone: n('#r-phone'), carrier: n('#r-car'), phone_owner: n('#r-own'), programs: $('#r-prog').value.trim(), ins_company: n('#r-co'), insurance: n('#r-ins'), deposit_group: n('#r-dep'),
           daily_fee: n('#r-daily'), insurance_cost: n('#r-real'), chang_fee: n('#r-chang'), status: '가입', callmaner_cost: n('#r-cm'), total_cost: n('#r-tot'), margin: n('#r-mar'), source: n('#r-src'), note: n('#r-note') };
         if (p.ssn && p.ssn.replace(/[^0-9]/g, '').length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); return; }
         this.disabled = true;
@@ -311,9 +312,9 @@
   var SRX = { '블로그': /블로그/g, '유튜브': /유튜브/g, '소개': /소개/g, '타타타': /타타타/g, 'BK오더방': /BK\s*오더방|오더방/g, '이실장': /이실장/g, '오우달': /오우달/g, '새달사': /새달사\s*쪽지|새달사/g, '현근 영업': /현근\s*영업|현근/g, '지인': /지인/g };
   function stripSrc(t, src) { var x = String(t || ''); if (src && SRX[src]) x = x.replace(SRX[src], ' '); x = x.replace(/\(\s*\)/g, ' ').replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim(); var m = /^\((.*)\)$/.exec(x); if (m) x = m[1].trim(); x = x.replace(/^[\s,·\/\-:]+|[\s,·\/\-:]+$/g, '').trim(); return x; }
   function detectSrc(t) { t = String(t || ''); var order = [['블로그', '블로그'], ['유튜브', '유튜브'], ['소개', '소개'], ['타타타', '타타타'], ['오더방', 'BK오더방'], ['이실장', '이실장'], ['오우달', '오우달'], ['새달사', '새달사'], ['현근', '현근 영업'], ['지인', '지인']]; for (var i = 0; i < order.length; i++) if (t.indexOf(order[i][0]) >= 0) return order[i][1]; return null; }
-  var DWP = { joined_at: 84, status: 62, emp_no: 56, team: 72, name: 94, ssn: 122, phone: 116, carrier: 84, phone_owner: 70, programs: 126, ins_company: 104, insurance: 100, deposit_group: 146, callmaner_cost: 96, daily_fee: 72, insurance_cost: 88, chang_fee: 78, total_cost: 104, margin: 78, source: 84, note: 88, license: 106 };
-  var DDEF = ['status', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'source', 'license'];
-  var DEXPD = ['status', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost'];
+  var DWP = { joined_at: 84, status: 60, emp_no: 52, team: 70, name: 90, ssn: 112, phone: 106, carrier: 82, phone_owner: 66, programs: 124, ins_company: 92, insurance: 96, deposit_group: 130, callmaner_cost: 88, daily_fee: 70, insurance_cost: 80, chang_fee: 76, total_cost: 96, margin: 76, source: 82, note: 84, license: 102 };
+  var DDEF = ['joined_at', 'status', 'emp_no', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'source', 'license'];
+  var DEXPD = ['joined_at', 'status', 'emp_no', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost'];
   function allKeys() { return DCOL.map(function (c) { return c[0]; }).concat(['license']); }
   var dvis = (function () { try { var a = JSON.parse(localStorage.getItem('gd_dvis') || 'null'); if (Array.isArray(a)) { a = a.filter(function (k) { return allKeys().indexOf(k) >= 0; }); if (a.length) return a; } } catch (e) {} return DDEF.slice(); })();
   function saveVis() { try { localStorage.setItem('gd_dvis', JSON.stringify(dvis)); } catch (e) {} }
