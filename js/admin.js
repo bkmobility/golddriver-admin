@@ -162,7 +162,7 @@
     $('#x-no').addEventListener('click', function () { m.hidden = true; });
     $('#x-ok').addEventListener('click', function () {
       this.disabled = true;
-      var ids = list.map(function (a) { return a.id; }), paths = list.map(function (a) { return a.license_path; }).filter(Boolean);
+      var ids = list.map(function (a) { return a.id; }), paths = list.map(function (a) { return a.license_path; }).concat(list.map(function (a) { return a.selfie_path; })).filter(Boolean);
       (paths.length ? sb.storage.from('golddriver-licenses').remove(paths) : Promise.resolve()).then(function () {
         return sb.from('golddriver_applications').delete().in('id', ids);
       }).then(function (r) {
@@ -173,22 +173,81 @@
     });
   }
 
+  /* ---------- 신청 내용 공유 (카카오톡 · 문자 등) ---------- */
+  function shareLines(a) {
+    return ['이름 : ' + a.name, '생년월일 : ' + a.birth_date + ' (만 ' + age(a.birth_date) + '세)', '전화번호 : ' + fmtPhone(a.phone), '지역 : ' + (a.region || '-'), '통신사 : ' + (CAR[a.carrier] || '-'), '휴대폰 명의 : ' + (OWN[a.phone_owner] || '-'), '휴대폰 기종 : ' + (a.device_model || '-'), '업무/방식 : ' + (WT[a.work_type] || '-') + ' / ' + (WM[a.work_mode] || '-'), '보험 : ' + (INS[a.insurance] || '-'),
+      '사용 경험 앱 : ' + ((a.used_apps || []).map(function (x) { return APPN[x] || x; }).join(', ') || '-'),
+      '신청 앱 : ' + (['logi', 'callmaner', 'aicon'].filter(function (k) { return (a.selected_apps || {})[k] > 0; }).map(function (k) { return APPN[k] + ' ' + a.selected_apps[k]; }).join(', ') || '-'), '메모 : ' + (a.memo || '')];
+  }
+  function shareText(a, extra) {
+    var L = shareLines(a).concat(extra || []);
+    return L.map(function (x, i) { return (i + 1) + '. ' + x; }).join('\n');
+  }
+  function copyText(t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    return new Promise(function (res, rej) { var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;left:-999px'; document.body.appendChild(ta); ta.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); ok ? res() : rej(); });
+  }
+  function shareSheet(a) {
+    var m = $('#modal'), photos = [];
+    if (a.license_path) photos.push({ k: 'lic', label: '운전면허증 사진', line: '운전면허증 사진 첨부', path: a.license_path, file: '면허증' });
+    if (a.selfie_path) photos.push({ k: 'self', label: '본인 셀프 사진', line: '본인 셀프 사진 첨부', path: a.selfie_path, file: '본인사진' });
+    var tailRe = /\n?\d+\. (운전면허증|본인 셀프) 사진 첨부/g;
+    m.innerHTML = '<div class="mbox"><h3>신청 내용 공유</h3><div class="mut" style="margin-bottom:8px">카카오톡 · 문자 등으로 보낼 내용이에요. 보내기 전에 글을 고칠 수 있어요.</div><textarea id="sh-t" rows="14" style="width:100%;font-size:14px;line-height:1.55"></textarea>' +
+      photos.map(function (ph) { return '<label class="shchk"><input type="checkbox" data-p="' + ph.k + '" checked> <span>' + ph.label + '도 함께 보내기</span><img class="shth" data-t="' + ph.k + '" alt=""></label>'; }).join('') +
+      '<div class="acts"><button class="btn" id="sh-go">카카오톡 · 문자로 공유</button><button class="btn line" id="sh-cp">글만 복사</button><button class="btn line" id="sh-x">닫기</button></div><div class="mut" style="font-size:12px;margin-top:8px">「공유」를 누르면 휴대폰 공유 창이 열려요. 거기서 카카오톡이나 문자를 고르세요.</div></div>';
+    m.hidden = false;
+    var ta = $('#sh-t', m), files = {};
+    function checked(k) { var c = $('input[data-p="' + k + '"]', m); return !!(c && c.checked); }
+    function setText() {
+      var cur = ta.value.replace(tailRe, '').replace(/\s+$/, '');
+      var extra = photos.filter(function (ph) { return checked(ph.k); }).map(function (ph) { return ph.line; });
+      var base = cur ? cur : shareText(a);
+      var n = base.split('\n').filter(function (x) { return /^\d+\. /.test(x); }).length;
+      ta.value = base + extra.map(function (x, i) { return '\n' + (n + i + 1) + '. ' + x; }).join('');
+    }
+    ta.value = shareText(a); setText();
+    $$('input[data-p]', m).forEach(function (c) { c.addEventListener('change', setText); });
+    photos.forEach(function (ph) {
+      sb.storage.from('golddriver-licenses').createSignedUrl(ph.path, 300).then(function (r) {
+        if (!r.data) return; var im = $('img[data-t="' + ph.k + '"]', m); if (im) im.src = r.data.signedUrl;
+        return fetch(r.data.signedUrl).then(function (x) { return x.blob(); }).then(function (b) { files[ph.k] = new File([b], a.name + '_' + ph.file + '.jpg', { type: b.type || 'image/jpeg' }); });
+      }).catch(function () {});
+    });
+    $('#sh-x', m).addEventListener('click', function () { m.hidden = true; });
+    $('#sh-cp', m).addEventListener('click', function () { copyText(ta.value).then(function () { toast('글을 복사했어요. 카카오톡이나 문자에 붙여넣기 하세요'); }, function () { toast('복사하지 못했어요. 글을 길게 눌러 복사해 주세요'); }); });
+    $('#sh-go', m).addEventListener('click', function () {
+      var fl = photos.filter(function (ph) { return checked(ph.k) && files[ph.k]; }).map(function (ph) { return files[ph.k]; });
+      var want = photos.filter(function (ph) { return checked(ph.k); }).length;
+      var data = { text: ta.value, title: a.name + ' 신청 내용' };
+      if (fl.length) data.files = fl;
+      if (!navigator.share) { copyText(ta.value).then(function () { toast('이 화면에서는 바로 공유가 안 돼요. 글을 복사했어요'); }, function () { toast('공유를 지원하지 않는 화면이에요'); }); return; }
+      if (fl.length && !(navigator.canShare && navigator.canShare({ files: fl }))) { delete data.files; toast('사진은 이 화면에서 공유할 수 없어 글만 보내요'); }
+      else if (want && !fl.length) { toast('사진을 아직 불러오는 중이에요. 잠시 후 다시 눌러 주세요'); return; }
+      navigator.share(data).catch(function (e) { if (e && e.name !== 'AbortError') toast('공유하지 못했어요. 글만 복사해 보세요'); });
+    });
+  }
   /* ---------- 상세 서랍 ---------- */
   function openDrawer(id) {
     var a = apps.filter(function (x) { return x.id === id; })[0]; if (!a) return;
     var d = $('#drawer');
     var sOpts = Object.keys(ST).map(function (k) { return '<option value="' + k + '"' + (a.status === k ? ' selected' : '') + '>' + ST[k][0] + '</option>'; }).join('');
     d.innerHTML = '<div class="dbox"><div style="display:flex;justify-content:space-between"><h3>' + esc(a.name) + ' ' + stTag(a.status) + '</h3><button class="btn sm line" id="dx">닫기</button></div><div class="mut">' + esc(a.receipt_no) + ' · ' + ymdhm(a.created_at) + '</div>' +
-      '<div class="acts"><a class="btn" href="' + tel(a.phone) + '">전화 걸기</a><a class="btn line" href="' + sms(a.phone, a.name + '님, 골드대리운전입니다.') + '">문자 보내기</a>' +
+      '<div class="acts"><a class="btn" href="' + tel(a.phone) + '">전화 걸기</a><a class="btn line" href="' + sms(a.phone, a.name + '님, 골드대리운전입니다.') + '">문자 보내기</a><button class="btn line" id="dshare">공유</button>' +
       (a.payment_status === 'requested' ? '<a class="btn dark" href="' + sms(a.phone, a.name + '님, 골드대리운전 첫 달 이용료 안내드립니다. 예상 금액 ' + n0(a.payment_amount) + '원. 입금 계좌는 [여기에 계좌 입력]') + '">결제 안내 문자</a>' : '') + '</div>' +
       '<dl class="kv"><dt>생년월일</dt><dd>' + esc(a.birth_date) + ' (만 ' + age(a.birth_date) + '세)</dd><dt>전화번호</dt><dd>' + fmtPhone(a.phone) + '</dd><dt>지역</dt><dd>' + esc(a.region || '-') + '</dd><dt>통신사</dt><dd>' + esc(CAR[a.carrier] || '-') + '</dd><dt>휴대폰 명의</dt><dd>' + esc(OWN[a.phone_owner] || '-') + '</dd><dt>휴대폰 기종</dt><dd>' + esc(a.device_model || '-') + '</dd><dt>업무/방식</dt><dd>' + (WT[a.work_type] || '-') + ' / ' + (WM[a.work_mode] || '-') + '</dd><dt>보험</dt><dd>' + (INS[a.insurance] || '-') + '</dd><dt>사용 경험 앱</dt><dd>' + esc((a.used_apps || []).map(function (x) { return APPN[x] || x; }).join(', ') || '-') + '</dd><dt>신청 앱</dt><dd>' + esc(appsText(a)) + '</dd><dt>예상 금액</dt><dd>' + n0(a.payment_amount) + '원</dd><dt>유형</dt><dd>' + (a.signup_type === 'consult' ? '상담부터 · ' + esc(a.call_time || '') : '상담 없이 바로 가입') + '</dd><dt>궁금한 점</dt><dd>' + esc(a.question || '-') + '</dd><dt>추천인</dt><dd>' + esc(a.referrer || '-') + '</dd><dt>마케팅 동의</dt><dd>' + (a.consent_marketing ? '동의' : '미동의') + '</dd><dt>운전면허증</dt><dd>' + LIC[a.license_status] + '</dd><dt>결제</dt><dd>' + PAY[a.payment_status] + '</dd></dl>' +
-      '<div id="licarea"></div>' +
+      '<div id="licarea"></div><div id="selfarea"></div>' +
       '<div class="grid2"><div class="f"><label>상태</label><select id="d-st">' + sOpts + '</select></div><div class="f"><label>담당자</label><input id="d-as" value="' + esc(a.assignee || '') + '"></div></div>' +
       '<div class="f"><label>메모</label><textarea id="d-memo">' + esc(a.memo || '') + '</textarea></div>' +
       '<div class="acts"><button class="btn" id="d-save">저장</button>' + (a.driver_id ? '<span class="tag g big">기사 등록됨</span>' : '<button class="btn dark" id="d-reg">가입 완료 처리 → 기사 등록</button>') + '</div></div>';
     d.hidden = false;
     d.addEventListener('click', function h(e) { if (e.target === d) { d.hidden = true; d.removeEventListener('click', h); } });
     $('#dx').addEventListener('click', function () { d.hidden = true; });
+    $('#dshare').addEventListener('click', function () { shareSheet(a); });
+    if (a.selfie_path) {
+      sb.storage.from('golddriver-licenses').createSignedUrl(a.selfie_path, 600).then(function (r) {
+        $('#selfarea').innerHTML = r.data ? '<b>본인 셀프 사진</b><a href="' + r.data.signedUrl + '" target="_blank"><img class="lic" src="' + r.data.signedUrl + '"></a>' : '<div class="err">본인 사진을 불러오지 못했어요</div>';
+      });
+    }
     if (a.license_path) {
       sb.storage.from('golddriver-licenses').createSignedUrl(a.license_path, 600).then(function (r) {
         $('#licarea').innerHTML = r.data ? '<b>운전면허증</b><a href="' + r.data.signedUrl + '" target="_blank"><img class="lic" src="' + r.data.signedUrl + '"></a><div class="mut" style="font-size:12px">보안을 위해 이 사진 링크는 10분 후 만료돼요 (창을 닫았다 다시 열면 새로 만들어져요)</div>' : '<div class="err">면허증을 불러오지 못했어요</div>';
@@ -274,7 +333,7 @@
         '<div class="grid3"><div class="f"><label>가입일</label><input id="r-date" type="date" value="' + todayStr() + '"></div><div class="f"><label>사번</label><input id="r-emp" type="number" value="' + (r.data || '') + '"></div><div class="f"><label>소속</label><input id="r-team" value="골드 2팀"></div>' +
         '<div class="f"><label>성명</label><input id="r-name" value="' + esc(a.name) + '"></div><div class="f"><label>주민번호</label><input id="r-ssn" placeholder="000000-0000000" maxlength="14" autocomplete="off"><div class="ocr" id="r-ocr"></div></div><div class="f"><label>핸드폰 번호</label><input id="r-phone" value="' + esc(fmtPhone(a.phone)) + '"></div>' +
         '<div class="f"><label>통신사 <small class="auto">신청서</small></label><input id="r-car" value="' + esc(CAR[a.carrier] || '') + '"></div><div class="f"><label>명의 <small class="auto">신청서</small></label><input id="r-own" value="' + (a.phone_owner === 'other' ? '타인' : a.phone_owner === 'self' ? '본인' : '') + '"></div><div class="f"><label>설치 프로그램 <small class="auto">신청서</small></label><input id="r-prog" value="' + esc(Object.keys(a.selected_apps || {}).filter(function (k) { return a.selected_apps[k] > 0 && /^(logi|callmaner|aicon)$/.test(k); }).map(function (k) { return APPN[k] + ' ' + a.selected_apps[k]; }).join(', ')) + '"></div>' +
-        '<div class="f"><label>보험 회사명</label><input id="r-co"></div><div class="f"><label>보험 종류</label><input id="r-ins" value="' + ins + '"></div><div class="f"><label>입금 그룹명</label><input id="r-dep"></div>' +
+        '<div class="f"><label>보험 회사명</label><input id="r-co"></div><div class="f"><label>보험 종류</label><input id="r-ins" value="' + ins + '"></div><div class="f"><label>입금 그룹명</label><input id="r-dep" placeholder="월보험 · 건당보험1000 …"></div>' +
         '<div class="f"><label>일비</label><input id="r-daily" type="number" inputmode="numeric" value=""></div><div class="f"><label>실보험료</label><input id="r-real" type="number" inputmode="numeric" value="0"></div><div class="f"><label>창 비용</label><input id="r-chang" type="number" inputmode="numeric" value="17000"></div>' +
         '<div class="f"><label>콜마너 비용</label><input id="r-cm" type="number" inputmode="numeric" value="0"></div><div class="f"><label>월 합산 비용 (일비×30)</label><input id="r-tot" type="number" value="0"></div><div class="f"><label>순 마진 ((월합산−창비용−실보험료+콜마너)÷2)</label><input id="r-mar" type="number" value="0"></div></div>' +
         '<div class="f"><label>유입 경로</label><input id="r-src" list="srcl" placeholder="블로그 · 유튜브 · 소개 …"></div><div class="f"><label>비고</label><input id="r-note"></div>' +
