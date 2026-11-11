@@ -324,3 +324,10 @@ table.dt th.lh{background:#ffefb5;color:#7a5200}table.dt td.lc{padding:4px 2px}
  #main.dfix .sscroll{flex:1;min-height:160px;overflow:auto;padding-bottom:16px}
  #main.dfix .dtw::-webkit-scrollbar{height:14px;width:14px}#main.dfix .dtw::-webkit-scrollbar-track{background:#e3e8f3}#main.dfix .dtw::-webkit-scrollbar-thumb{background:#12204a;border-radius:8px;border:3px solid #e3e8f3}
 }
+
+/* v2.9 */
+.pwb{display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:4px;white-space:nowrap;border:1px solid}
+.pwb.y{background:#fffbeb;color:#92400e;border-color:#fde68a}.pwb.r{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+.pwbox{border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0;border:1px solid;line-height:1.6}
+.pwbox.y{background:#fffbeb;color:#92400e;border-color:#fde68a}.pwbox.r{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+.depch{display:flex;gap:6px;margin-top:5px}.depch .chip{padding:4px 14px;font-size:12.5px;font-weight:700;border:1px solid #cbd5e1;border-radius:14px;background:#fff;cursor:pointer}

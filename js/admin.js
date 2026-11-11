@@ -29,6 +29,35 @@
   function pno(t) { var g = String(t).replace(/[^0-9]/g, ''); return g === '' ? null : parseInt(g, 10); }
   function n0(v) { return Number(v || 0).toLocaleString('ko-KR'); }
   function appsText(a) { var o = []; for (var k in (a.selected_apps || {})) o.push(APPN[k] + ' ' + a.selected_apps[k]); return o.join(', ') || '-'; }
+
+  /* v2.9: 보증금 빠른 선택 버튼 + 번호 경고 */
+  function depChips(id) { return '<div class="depch"><button type="button" class="chip dch" data-for="' + id + '" data-v="30,000">30,000</button><button type="button" class="chip dch" data-for="' + id + '" data-v="0">0</button></div>'; }
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.dch'); if (!b) return; var i = document.getElementById(b.getAttribute('data-for')); if (i) { i.value = b.getAttribute('data-v'); i.dispatchEvent(new Event('input', { bubbles: true })); } });
+  function phoneSus(p) {
+    var t = String(p || '').replace(/[^0-9]/g, '').slice(-8); if (t.length < 8) return false;
+    if (/^(\d)\1{7}$/.test(t)) return true;
+    if ('01234567890123456789'.indexOf(t) >= 0 || '98765432109876543210'.indexOf(t) >= 0) return true;
+    return t.slice(0, 4) === t.slice(4) || /^(\d\d)\1{3}$/.test(t);
+  }
+  function phoneDups(p, selfApp, selfDrv) {
+    var dg = String(p || '').replace(/[^0-9]/g, ''), out = []; if (!dg) return out;
+    apps.forEach(function (a) { if (a.id !== selfApp && String(a.phone || '').replace(/[^0-9]/g, '') === dg && !(selfDrv && a.driver_id === selfDrv)) out.push({ t: 'a', o: a }); });
+    drivers.forEach(function (d) { if (d.id !== selfDrv && String(d.phone || '').replace(/[^0-9]/g, '') === dg && !(selfApp && d.application_id === selfApp)) out.push({ t: 'd', o: d }); });
+    return out;
+  }
+  function phBadge(p, selfApp, selfDrv) {
+    var h = '', du = phoneDups(p, selfApp, selfDrv);
+    if (phoneSus(p)) h += ' <span class="pwb y" title="연속·반복 숫자 번호예요">⚠ 의심 번호</span>';
+    if (du.length) h += ' <span class="pwb r" title="' + esc(du.map(function (x) { return x.t === 'a' ? (x.o.name + ' · 신청 ' + (x.o.receipt_no || '')) : (x.o.name + ' · 기사 ' + fno(x.o.emp_no)); }).join(' / ')) + '">⚠ 중복 ' + du.length + '건</span>';
+    return h;
+  }
+  function phWarnBox(p, selfApp, selfDrv) {
+    var du = phoneDups(p, selfApp, selfDrv), h = '';
+    if (phoneSus(p)) h += '<div class="pwbox y">⚠ 연속·반복 숫자 번호예요. 실제 연락되는 번호인지 전화로 확인해 보세요.</div>';
+    if (du.length) h += '<div class="pwbox r">⚠ 같은 번호가 ' + du.length + '건 더 있어요 (참고용)<br>' + du.map(function (x) { return x.t === 'a' ? '· <a href="#" class="pwgo" data-a="' + x.o.id + '">' + esc(x.o.name) + ' · 신청 ' + esc(x.o.receipt_no || '') + ' (' + ((ST[x.o.status] || [x.o.status])[0]) + ')</a>' : '· ' + esc(x.o.name) + ' · 기사 ' + fno(x.o.emp_no) + ' (' + esc(x.o.status || '가입') + ')'; }).join('<br>') + '</div>';
+    return h;
+  }
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.pwgo'); if (!b) return; e.preventDefault(); openDrawer(b.getAttribute('data-a')); });
   function stTag(s) { var x = ST[s] || [s, '']; return '<span class="tag ' + x[1] + '">' + x[0] + '</span>'; }
   function tel(p) { return 'tel:' + p; }
   function sms(p, body) { return 'sms:' + p + '?body=' + encodeURIComponent(body || ''); }
@@ -137,7 +166,7 @@
       '<div class="selbar"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="selall" style="width:18px;height:18px;padding:0"' + (allOn ? ' checked' : '') + '> 전체 선택</label><span class="mut">' + selN + '건 선택됨</span><button class="btn sm red" id="seldel"' + (selN ? '' : ' disabled') + '>선택 삭제</button></div>' +
       '<div class="tw"><table><thead><tr><th class="ck"></th><th>접수번호</th><th>접수일시</th><th>상태</th><th>이름</th><th>나이</th><th>전화번호</th><th>지역</th><th>통신사</th><th>명의</th><th>업무</th><th>방식</th><th>보험</th><th>유형</th><th>앱</th><th>운전면허증</th><th>거부 사유</th><th>담당자</th></tr></thead><tbody>' +
       rows.map(function (a) {
-        return '<tr class="clk s-' + a.status + '" data-id="' + a.id + '"><td class="ck" data-nodrawer="1"><input type="checkbox" class="rk" data-id="' + a.id + '"' + (sel[a.id] ? ' checked' : '') + '></td><td data-l="접수번호">' + esc(a.receipt_no) + '</td><td data-l="접수">' + ymdhm(a.created_at) + '</td><td data-l="상태">' + stTag(a.status) + '</td><td data-l="이름"><b>' + esc(a.name) + '</b></td><td data-l="나이">' + age(a.birth_date) + '</td><td data-l="전화">' + fmtPhone(a.phone) + '</td><td data-l="지역">' + esc(a.region) + '</td><td data-l="통신사">' + esc(CAR[a.carrier] || '-') + '</td><td data-l="명의">' + esc((OWN[a.phone_owner] || '-').replace(' 명의', '')) + '</td><td data-l="업무">' + (WT[a.work_type] || '-') + '</td><td data-l="방식">' + (WM[a.work_mode] || '-') + '</td><td data-l="보험">' + (INS[a.insurance] || '-') + '</td><td data-l="유형">' + (a.signup_type === 'consult' ? '상담' : '바로가입') + '</td><td data-l="앱">' + esc(appsText(a)) + '</td><td data-l="운전면허증">' + LIC[a.license_status] + '</td><td data-l="거부 사유">' + (a.status === 'hold' ? '<span class="rej">' + esc(a.reject_reason || '-') + '</span>' : '') + '</td><td data-l="담당자">' + esc(a.assignee || '-') + '</td></tr>';
+        return '<tr class="clk s-' + a.status + '" data-id="' + a.id + '"><td class="ck" data-nodrawer="1"><input type="checkbox" class="rk" data-id="' + a.id + '"' + (sel[a.id] ? ' checked' : '') + '></td><td data-l="접수번호">' + esc(a.receipt_no) + '</td><td data-l="접수">' + ymdhm(a.created_at) + '</td><td data-l="상태">' + stTag(a.status) + '</td><td data-l="이름"><b>' + esc(a.name) + '</b></td><td data-l="나이">' + age(a.birth_date) + '</td><td data-l="전화">' + fmtPhone(a.phone) + phBadge(a.phone, a.id, null) + '</td><td data-l="지역">' + esc(a.region) + '</td><td data-l="통신사">' + esc(CAR[a.carrier] || '-') + '</td><td data-l="명의">' + esc((OWN[a.phone_owner] || '-').replace(' 명의', '')) + '</td><td data-l="업무">' + (WT[a.work_type] || '-') + '</td><td data-l="방식">' + (WM[a.work_mode] || '-') + '</td><td data-l="보험">' + (INS[a.insurance] || '-') + '</td><td data-l="유형">' + (a.signup_type === 'consult' ? '상담' : '바로가입') + '</td><td data-l="앱">' + esc(appsText(a)) + '</td><td data-l="운전면허증">' + LIC[a.license_status] + '</td><td data-l="거부 사유">' + (a.status === 'hold' ? '<span class="rej">' + esc(a.reject_reason || '-') + '</span>' : '') + '</td><td data-l="담당자">' + esc(a.assignee || '-') + '</td></tr>';
       }).join('') + '</tbody></table></div>' + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">해당하는 신청이 없어요</div>');
     $$('.chip', v).forEach(function (b) { b.addEventListener('click', function () { filter = b.getAttribute('data-f'); sel = {}; render(); }); });
     $('#q', v).addEventListener('change', function () { q = this.value; sel = {}; render(); });
@@ -193,7 +222,7 @@
   }
   function numbered(L) { return L.map(function (x, i) { return (i + 1) + '. ' + x; }).join('\n'); }
   function driverLines(d) {
-    return ['이름 : ' + d.name + ' (사번 ' + fno(d.emp_no) + ')', '가입일 : ' + (d.joined_at || '-') + (d.team ? ' · ' + d.team : ''), '주민번호 : ' + (d.ssn ? maskSsn(d.ssn) + ' (뒷자리 가림)' : '-'), '핸드폰 : ' + fmtPhone(d.phone), '통신사 / 명의 : ' + (d.carrier || '-') + ' / ' + (d.phone_owner || '-'), '설치 프로그램 : ' + (d.programs || '-'), '보험 : ' + (d.insurance || '-') + (d.ins_company ? ' (보험회사 ' + d.ins_company + ')' : ''), '입금 그룹명 : ' + (d.deposit_group || '-'), '일비 : ' + n0(d.daily_fee) + '원 · 월 합산 비용 : ' + n0(d.total_cost) + '원', '유입 경로 : ' + (d.source || '-'), '비고 : ' + (d.note || '')];
+    return ['이름 : ' + d.name + ' (사번 ' + fno(d.emp_no) + ')', '가입일 : ' + (d.joined_at || '-') + (d.team ? ' · ' + d.team : ''), '주민번호 : ' + (d.ssn ? maskSsn(d.ssn) + ' (뒷자리 가림)' : '-'), '핸드폰 : ' + fmtPhone(d.phone), '통신사 / 명의 : ' + (d.carrier || '-') + ' / ' + (d.phone_owner || '-'), '설치 프로그램 : ' + (d.programs || '-'), '보험 : ' + (d.insurance || '-') + (d.ins_company ? ' (보험회사 ' + d.ins_company + ')' : ''), '입금 그룹명 : ' + (d.deposit_group || '-'), '보증금 : ' + n0(d.deposit_amount) + '원', '일비 : ' + n0(d.daily_fee) + '원 · 월 합산 비용 : ' + n0(d.total_cost) + '원', '유입 경로 : ' + (d.source || '-'), '비고 : ' + (d.note || '')];
   }
   function driverShare(list) {
     if (!list || !list.length) { toast('공유할 기사를 먼저 체크해 주세요'); return; }
@@ -286,7 +315,7 @@
     var a = apps.filter(function (x) { return x.id === id; })[0]; if (!a) return;
     var d = $('#drawer');
     var sOpts = Object.keys(ST).filter(function (k) { return k !== 'hold' || a.status === 'hold'; }).map(function (k) { return '<option value="' + k + '"' + (a.status === k ? ' selected' : '') + '>' + ST[k][0] + '</option>'; }).join('');
-    d.innerHTML = '<div class="dbox"><div style="display:flex;justify-content:space-between"><h3>' + esc(a.name) + ' ' + stTag(a.status) + '</h3><button class="btn sm line" id="dx">닫기</button></div><div class="mut">' + esc(a.receipt_no) + ' · ' + ymdhm(a.created_at) + '</div>' +
+    d.innerHTML = '<div class="dbox"><div style="display:flex;justify-content:space-between"><h3>' + esc(a.name) + ' ' + stTag(a.status) + '</h3><button class="btn sm line" id="dx">닫기</button></div><div class="mut">' + esc(a.receipt_no) + ' · ' + ymdhm(a.created_at) + '</div>' + phWarnBox(a.phone, a.id, a.driver_id || null) +
       '<div class="acts"><a class="btn" href="' + tel(a.phone) + '">전화 걸기</a><a class="btn line" href="' + sms(a.phone, a.name + '님, 골드대리운전입니다.') + '">문자 보내기</a><button class="btn line" id="dshare">공유</button>' +
       (a.payment_status === 'requested' ? '<a class="btn dark" href="' + sms(a.phone, a.name + '님, 골드대리운전 첫 달 이용료 안내드립니다. 예상 금액 ' + n0(a.payment_amount) + '원. 입금 계좌는 [여기에 계좌 입력]') + '">결제 안내 문자</a>' : '') + '</div>' +
       '<dl class="kv"><dt>생년월일</dt><dd>' + esc(a.birth_date) + ' (만 ' + age(a.birth_date) + '세)</dd><dt>전화번호</dt><dd>' + fmtPhone(a.phone) + '</dd><dt>지역</dt><dd>' + esc(a.region || '-') + '</dd><dt>통신사</dt><dd>' + esc(CAR[a.carrier] || '-') + '</dd><dt>휴대폰 명의</dt><dd>' + esc(OWN[a.phone_owner] || '-') + '</dd><dt>휴대폰 기종</dt><dd>' + esc(a.device_model || '-') + '</dd><dt>업무/방식</dt><dd>' + (WT[a.work_type] || '-') + ' / ' + (WM[a.work_mode] || '-') + '</dd><dt>보험</dt><dd>' + (INS[a.insurance] || '-') + '</dd><dt>사용 경험 앱</dt><dd>' + esc((a.used_apps || []).map(function (x) { return APPN[x] || x; }).join(', ') || '-') + '</dd><dt>신청 앱</dt><dd>' + esc(appsText(a)) + '</dd><dt>예상 금액</dt><dd>' + n0(a.payment_amount) + '원</dd><dt>유형</dt><dd>' + (a.signup_type === 'consult' ? '상담부터 · ' + esc(a.call_time || '') : '상담 없이 바로 가입') + '</dd><dt>궁금한 점</dt><dd>' + esc(a.question || '-') + '</dd><dt>추천인</dt><dd>' + esc(a.referrer || '-') + '</dd><dt>마케팅 동의</dt><dd>' + (a.consent_marketing ? '동의' : '미동의') + '</dd><dt>운전면허증</dt><dd>' + LIC[a.license_status] + '</dd><dt>결제</dt><dd>' + PAY[a.payment_status] + '</dd></dl>' +
@@ -391,13 +420,13 @@
         '<div class="f"><label>성명</label><input id="r-name" value="' + esc(a.name) + '"></div><div class="f"><label>주민번호</label><input id="r-ssn" placeholder="000000-0000000" maxlength="14" autocomplete="off"><div class="ocr" id="r-ocr"></div></div><div class="f"><label>핸드폰 번호</label><input id="r-phone" value="' + esc(fmtPhone(a.phone)) + '"></div>' +
         '<div class="f"><label>통신사 <small class="auto">신청서</small></label><input id="r-car" value="' + esc(CAR[a.carrier] || '') + '"></div><div class="f"><label>명의 <small class="auto">신청서</small></label><input id="r-own" value="' + (a.phone_owner === 'other' ? '타인' : a.phone_owner === 'self' ? '본인' : '') + '"></div><div class="f"><label>설치 프로그램 <small class="auto">신청서</small></label><input id="r-prog" value="' + esc(Object.keys(a.selected_apps || {}).filter(function (k) { return a.selected_apps[k] > 0 && /^(logi|callmaner|aicon)$/.test(k); }).map(function (k) { return APPN[k] + ' ' + a.selected_apps[k]; }).join(', ')) + '"></div>' +
         '<div class="f"><label>보험 회사명</label><input id="r-co"></div><div class="f"><label>보험 종류</label><input id="r-ins" value="' + ins + '"></div><div class="f"><label>입금 그룹명</label><input id="r-dep" placeholder="월보험 · 건당보험1000 …"></div>' +
-        '<div class="f"><label>일비</label><input id="r-daily" type="number" inputmode="numeric" value=""></div><div class="f"><label>실보험료</label><input id="r-real" type="number" inputmode="numeric" value="0"></div><div class="f"><label>창 비용</label><input id="r-chang" type="number" inputmode="numeric" value="17000"></div>' +
+        '<div class="f"><label>보증금</label><input id="r-dep2" value="0">' + depChips('r-dep2') + '</div><div class="f"><label>일비</label><input id="r-daily" type="number" inputmode="numeric" value=""></div><div class="f"><label>실보험료</label><input id="r-real" type="number" inputmode="numeric" value="0"></div><div class="f"><label>창 비용</label><input id="r-chang" type="number" inputmode="numeric" value="17000"></div>' +
         '<div class="f"><label>콜마너 비용</label><input id="r-cm" type="number" inputmode="numeric" value="0"></div><div class="f"><label>월 합산 비용 (일비×30)</label><input id="r-tot" type="number" value="0"></div><div class="f"><label>순 마진 ((월합산−창비용−실보험료+콜마너)÷2)</label><input id="r-mar" type="number" value="0"></div></div>' +
         '<div class="f"><label>유입 경로</label><input id="r-src" list="srcl" placeholder="블로그 · 유튜브 · 소개 …"></div><div class="f"><label>비고</label><input id="r-note"></div>' +
         '<div class="acts"><button class="btn" id="r-ok">등록</button><button class="btn line" id="r-no">취소</button></div></div>';
       m.hidden = false;
       $('#r-ssn').addEventListener('input', function () { var d = this.value.replace(/[^0-9]/g, '').slice(0, 13); this.value = d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; });
-      money(['#r-daily', '#r-real', '#r-chang', '#r-cm', '#r-tot', '#r-mar']);
+      money(['#r-dep2', '#r-daily', '#r-real', '#r-chang', '#r-cm', '#r-tot', '#r-mar']);
       var rmar = function () { $('#r-mar').value = n0(calcMargin($('#r-tot').value, $('#r-chang').value, $('#r-real').value, $('#r-cm').value)); };
       $('#r-daily').addEventListener('input', function () { $('#r-tot').value = n0(calcTotal(this.value)); rmar(); });
       ['#r-tot', '#r-chang', '#r-real', '#r-cm'].forEach(function (q) { $(q).addEventListener('input', rmar); });
@@ -409,7 +438,7 @@
       $('#r-ok').addEventListener('click', function () {
         var n = function (id) { return $(id).value.replace(/,/g, '').trim(); };
         var p = { joined_at: n('#r-date'), emp_no: n('#r-emp'), team: n('#r-team'), name: n('#r-name'), ssn: n('#r-ssn'), phone: n('#r-phone'), carrier: n('#r-car'), phone_owner: n('#r-own'), programs: $('#r-prog').value.trim(), ins_company: n('#r-co'), insurance: n('#r-ins'), deposit_group: n('#r-dep'),
-          daily_fee: n('#r-daily'), insurance_cost: n('#r-real'), chang_fee: n('#r-chang'), status: '가입', callmaner_cost: n('#r-cm'), total_cost: n('#r-tot'), margin: n('#r-mar'), source: n('#r-src'), note: n('#r-note') };
+          deposit_amount: n('#r-dep2'), daily_fee: n('#r-daily'), insurance_cost: n('#r-real'), chang_fee: n('#r-chang'), status: '가입', callmaner_cost: n('#r-cm'), total_cost: n('#r-tot'), margin: n('#r-mar'), source: n('#r-src'), note: n('#r-note') };
         if (p.ssn && p.ssn.replace(/[^0-9]/g, '').length !== 13) { toast('주민번호는 13자리로 입력해 주세요'); return; }
         this.disabled = true;
         sb.rpc('golddriver_register_driver', { p_application_id: a.id, p: p }).then(function (x) {
@@ -423,17 +452,17 @@
 
   /* ---------- 기사 가입 현황 ---------- */
   var DCOL = [['joined_at', '가입일', 'd'], ['status', '상태', 't'], ['emp_no', '사번', 'n'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 's'], ['phone', '핸드폰 번호'], ['carrier', '통신사'], ['phone_owner', '명의'], ['programs', '설치 프로그램'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'],
-    ['callmaner_cost', '콜마너 비용', 'n'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n'], ['source', '유입 경로'], ['note', '비고', 'm']];
+    ['callmaner_cost', '콜마너 비용', 'n'], ['deposit_amount', '보증금', 'n'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['total_cost', '월 합산 비용', 'n'], ['margin', '순 마진', 'n'], ['source', '유입 경로'], ['note', '비고', 'm']];
   var SRC = ['블로그', '유튜브', '소개', '타타타', 'BK오더방', '이실장', '오우달', '새달사', '현근 영업', '지인'];
   var SRX = { '블로그': /블로그/g, '유튜브': /유튜브/g, '소개': /소개/g, '타타타': /타타타/g, 'BK오더방': /BK\s*오더방|오더방/g, '이실장': /이실장/g, '오우달': /오우달/g, '새달사': /새달사\s*쪽지|새달사/g, '현근 영업': /현근\s*영업|현근/g, '지인': /지인/g };
   function stripSrc(t, src) { var x = String(t || ''); if (src && SRX[src]) x = x.replace(SRX[src], ' '); x = x.replace(/\(\s*\)/g, ' ').replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim(); var m = /^\((.*)\)$/.exec(x); if (m) x = m[1].trim(); x = x.replace(/^[\s,·\/\-:]+|[\s,·\/\-:]+$/g, '').trim(); return x; }
   function detectSrc(t) { t = String(t || ''); var order = [['블로그', '블로그'], ['유튜브', '유튜브'], ['소개', '소개'], ['타타타', '타타타'], ['오더방', 'BK오더방'], ['이실장', '이실장'], ['오우달', '오우달'], ['새달사', '새달사'], ['현근', '현근 영업'], ['지인', '지인']]; for (var i = 0; i < order.length; i++) if (t.indexOf(order[i][0]) >= 0) return order[i][1]; return null; }
-  var DWP = { joined_at: 84, status: 60, emp_no: 52, team: 70, name: 90, ssn: 112, phone: 106, carrier: 82, phone_owner: 66, programs: 124, ins_company: 92, insurance: 96, deposit_group: 118, callmaner_cost: 88, daily_fee: 70, insurance_cost: 80, chang_fee: 76, total_cost: 96, margin: 76, source: 82, note: 84, license: 92, selfie: 92 };
-  var DDEF = ['joined_at', 'status', 'emp_no', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'source', 'license', 'selfie'];
-  var DEXPD = ['joined_at', 'status', 'emp_no', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost'];
+  var DWP = { joined_at: 84, status: 60, emp_no: 52, team: 70, name: 90, ssn: 112, phone: 150, carrier: 82, phone_owner: 66, programs: 124, ins_company: 92, insurance: 96, deposit_group: 118, callmaner_cost: 88, deposit_amount: 72, daily_fee: 70, insurance_cost: 80, chang_fee: 76, total_cost: 96, margin: 76, source: 82, note: 84, license: 92, selfie: 92 };
+  var DDEF = ['joined_at', 'status', 'emp_no', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'deposit_amount', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'source', 'license', 'selfie'];
+  var DEXPD = ['joined_at', 'status', 'emp_no', 'name', 'ssn', 'phone', 'ins_company', 'insurance', 'deposit_group', 'callmaner_cost', 'deposit_amount', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost'];
   function allKeys() { return DCOL.map(function (c) { return c[0]; }).concat(['license', 'selfie']); }
-  var dvis = (function () { try { var a = JSON.parse(localStorage.getItem('gd_dvis28') || 'null'); if (Array.isArray(a)) { a = a.filter(function (k) { return allKeys().indexOf(k) >= 0; }); if (a.length) return a; } } catch (e) {} return DDEF.slice(); })();
-  function saveVis() { try { localStorage.setItem('gd_dvis28', JSON.stringify(dvis)); } catch (e) {} }
+  var dvis = (function () { try { var a = JSON.parse(localStorage.getItem('gd_dvis29') || 'null'); if (Array.isArray(a)) { a = a.filter(function (k) { return allKeys().indexOf(k) >= 0; }); if (a.length) return a; } } catch (e) {} return DDEF.slice(); })();
+  function saveVis() { try { localStorage.setItem('gd_dvis29', JSON.stringify(dvis)); } catch (e) {} }
   function visCols() { return DCOL.filter(function (c) { return dvis.indexOf(c[0]) >= 0; }); }
   function isDefVis() { return dvis.length === DDEF.length && DDEF.every(function (k) { return dvis.indexOf(k) >= 0; }); }
   function setOvf() { $$('.dtw').forEach(function (w) { var t = $('table.dt', w); if (!t) return; w.classList.remove('ovf'); if (t.scrollWidth > w.clientWidth + 1) w.classList.add('ovf'); }); }
@@ -451,7 +480,7 @@
   var dfv = {}, dfm = false, dpage = 1, dsize = 50, dmore = 50, dstatAll = false, smon = '', STS = ['가입', '퇴사', '미납'];
   var dsel = {};
   var DALIAS = { 가입일: 'joined_at', 사번: 'emp_no', 소속: 'team', 성명: 'name', 이름: 'name', 주민번호: 'ssn', 주민등록번호: 'ssn', 핸드폰번호: 'phone', 휴대폰번호: 'phone', 전화번호: 'phone', 핸드폰: 'phone', 통신사: 'carrier', 통신사정보: 'carrier', 명의: 'phone_owner', 설치프로그램: 'programs', 설치: 'programs', 보험회사명: 'ins_company', 보험회사: 'ins_company',
-    보험종류: 'insurance', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 일관리비: 'daily_fee', 창비: 'chang_fee', 창비용: 'chang_fee', 상태: 'status', 유입경로: 'source', 천안콜마너비용: 'callmaner_cost', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
+    보험종류: 'insurance', 보증금: 'deposit_amount', 보험: 'insurance', 입금그룹명: 'deposit_group', 일비: 'daily_fee', 일관리비: 'daily_fee', 창비: 'chang_fee', 창비용: 'chang_fee', 상태: 'status', 유입경로: 'source', 천안콜마너비용: 'callmaner_cost', 실보험료: 'insurance_cost', 월보험비용: 'insurance_cost', 월합산비용: 'total_cost', 순마진: 'margin', 월마진: 'margin', 콜마너비용: 'callmaner_cost', 비고: 'note' };
   var dq = '';
   function dval(d, c) { var v = d[c[0]]; if (v == null) return ''; if (c[0] === 'emp_no') return fno(v); if (c[0] === 'phone') return fmtPhone(v); if (c[2] === 'n' && c[0] !== 'emp_no') return n0(v); return v; }
   function viewDrivers(v) {
@@ -474,13 +503,13 @@
           if (k === 'status') return '<td data-l="상태"><select class="cell st st-' + esc(d.status || '가입') + '" data-id="' + d.id + '" data-k="status">' + STS.map(function (x) { return '<option' + ((d.status || '가입') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></td>';
           if (k === 'source') return '<td data-l="유입 경로"><input class="cell" list="srcl" data-id="' + d.id + '" data-k="source" value="' + esc(d.source || '') + '"></td>';
           if (k === 'note') return '<td data-l="비고" class="nt"><div class="note" data-id="' + d.id + '" title="' + esc(d.note || '') + '">' + (d.note ? esc(d.note) : '<span class="mut">+ 메모</span>') + '</div></td>';
-          if (k === 'phone') return '<td data-l="' + c[1] + '"><input class="cell" data-id="' + d.id + '" data-k="phone" value="' + esc(val) + '" readonly title="누르면 전화 · 길게 누르거나 더블클릭하면 수정"></td>';
+          if (k === 'phone') return '<td data-l="' + c[1] + '"><input class="cell" data-id="' + d.id + '" data-k="phone" value="' + esc(val) + '" readonly title="누르면 전화 · 길게 누르거나 더블클릭하면 수정">' + phBadge(d.phone, d.application_id || null, d.id) + '</td>';
           if (k === 'name') return '<td class="nm" data-l="성명"><b><input class="cell" data-id="' + d.id + '" data-k="name" value="' + esc(val) + '"></b></td>';
           if (k === 'ssn') return '<td data-l="주민번호"><input class="cell ssn" data-id="' + d.id + '" data-k="ssn" data-full="' + esc(fmtSsn(d.ssn)) + '" value="' + esc(maskSsn(d.ssn)) + '" maxlength="14" autocomplete="off" placeholder="000000-0000000"></td>';
           if (t === 'd') return '<td data-l="가입일"><input class="cell" type="text" inputmode="numeric" maxlength="10" data-id="' + d.id + '" data-k="' + k + '" data-n="d" placeholder="날짜 입력" value="' + esc(val) + '"></td>';
           return '<td data-l="' + c[1] + '"><input class="' + cls + '" data-id="' + d.id + '" data-k="' + k + '" data-n="' + (t || '') + '" value="' + esc(val) + '"' + '' + '></td>';
         }).join('') + (showLic ? licTd(d) : '') + (showSelf ? selTd(d) : '') + '</tr>';
-      }).join('') + '</tbody><tfoot><tr class="tf"><td class="ck"></td>' + VC.map(function (c) { var k = c[0]; if (k === 'name') return '<td class="nm"><b>합계</b></td>'; if (k === 'joined_at') return '<td><b>합계</b></td>'; if (['callmaner_cost', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin'].indexOf(k) >= 0) return '<td><b>' + n0(sum(k)) + '</b></td>'; return '<td></td>'; }).join('') + (showLic ? '<td></td>' : '') + (showSelf ? '<td></td>' : '') + '</tr></tfoot></table></div>' + pagerHtml + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">아직 기사가 없어요. 가입 신청에서 "가입 완료 처리"를 하면 아래에 순서대로 추가돼요.</div>');
+      }).join('') + '</tbody><tfoot><tr class="tf"><td class="ck"></td>' + VC.map(function (c) { var k = c[0]; if (k === 'name') return '<td class="nm"><b>합계</b></td>'; if (k === 'joined_at') return '<td><b>합계</b></td>'; if (['callmaner_cost', 'deposit_amount', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin'].indexOf(k) >= 0) return '<td><b>' + n0(sum(k)) + '</b></td>'; return '<td></td>'; }).join('') + (showLic ? '<td></td>' : '') + (showSelf ? '<td></td>' : '') + '</tr></tfoot></table></div>' + pagerHtml + (rows.length ? '' : '<div class="mut" style="padding:20px;text-align:center">아직 기사가 없어요. 가입 신청에서 "가입 완료 처리"를 하면 아래에 순서대로 추가돼요.</div>');
     $$('.dk', v).forEach(function (c) { c.addEventListener('change', function () { if (c.checked) dsel[c.getAttribute('data-id')] = 1; else delete dsel[c.getAttribute('data-id')]; viewDrivers(v); }); });
     $('#dselall', v).addEventListener('change', function () { var on = this.checked; rows.forEach(function (d) { if (on) dsel[d.id] = 1; else delete dsel[d.id]; }); viewDrivers(v); });
     $('#dseldel', v).addEventListener('click', function () { deleteDrivers(rows.filter(function (d) { return dsel[d.id]; }), false); });
@@ -684,13 +713,14 @@
   }
   function mEdit(id, v) {
     var d = drivers.filter(function (x) { return x.id === id; })[0]; if (!d) return;
-    var el = $('#medit'), F2 = [['status', '상태', 'sel'], ['joined_at', '가입일', 't'], ['emp_no', '사번', 'i'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 'ssn'], ['phone', '핸드폰', 'tel'], ['carrier', '통신사'], ['phone_owner', '명의'], ['programs', '설치 프로그램'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['callmaner_cost', '콜마너 비용', 'n'], ['total_cost', '월 합산 비용', 'ro'], ['margin', '순 마진', 'mg'], ['source', '유입 경로', 'src'], ['note', '비고', 'ta']];
+    var el = $('#medit'), F2 = [['status', '상태', 'sel'], ['joined_at', '가입일', 't'], ['emp_no', '사번', 'i'], ['team', '소속'], ['name', '성명'], ['ssn', '주민번호', 'ssn'], ['phone', '핸드폰', 'tel'], ['carrier', '통신사'], ['phone_owner', '명의'], ['programs', '설치 프로그램'], ['ins_company', '보험 회사명'], ['insurance', '보험 종류'], ['deposit_group', '입금 그룹명'], ['deposit_amount', '보증금', 'dep'], ['daily_fee', '일비', 'n'], ['insurance_cost', '실보험료', 'n'], ['chang_fee', '창 비용', 'n'], ['callmaner_cost', '콜마너 비용', 'n'], ['total_cost', '월 합산 비용', 'ro'], ['margin', '순 마진', 'mg'], ['source', '유입 경로', 'src'], ['note', '비고', 'ta']];
     var ph = String(d.phone || '').replace(/[^0-9]/g, '');
     el.innerHTML = '<div class="me"><div class="meh"><button id="me-back">‹</button><b>' + esc(d.name) + ' (' + fno(d.emp_no) + ')</b><span class="pill st-' + esc(d.status || '가입') + '">' + esc(d.status || '가입') + '</span></div><div class="meb"><div class="liccard"><div><b>운전면허증</b><span id="me-licst">' + (licPathOf(d) ? '등록됨' : '아직 등록되지 않았어요') + '</span></div><button class="btn sm" id="me-lic">' + (licPathOf(d) ? '보기 · 교체' : '＋ 등록') + '</button></div><div class="liccard"><div><b>본인 셀프 사진</b><span id="me-selst">' + (selfPathOf(d) ? '등록됨' : '아직 등록되지 않았어요') + '</span></div><button class="btn sm" id="me-self">' + (selfPathOf(d) ? '보기 · 교체' : '＋ 등록') + '</button></div><div class="liccard"><div><b>기사 정보 공유</b><span>글 · 사진을 카카오톡 · 문자로</span></div><button class="btn sm" id="me-sh">공유</button></div>' + F2.map(function (f) {
       var k = f[0], val = d[k], t = f[2] || '', inp;
       if (t === 'sel') inp = '<select id="me-' + k + '">' + STS.map(function (x) { return '<option' + ((d.status || '가입') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>';
       else if (t === 'ta') inp = '<textarea id="me-' + k + '" rows="4">' + esc(val || '') + '</textarea>';
       else if (t === 'ro' || t === 'mg') inp = '<input id="me-' + k + '" value="' + n0(val) + '" readonly>';
+      else if (t === 'dep') inp = '<input id="me-' + k + '" inputmode="numeric" value="' + n0(val) + '">' + depChips('me-' + k);
       else if (t === 'n') inp = '<input id="me-' + k + '" inputmode="numeric" value="' + n0(val) + '">';
       else if (t === 'ssn') inp = '<input id="me-' + k + '" value="' + esc(maskSsn(d.ssn)) + '" data-full="' + esc(fmtSsn(d.ssn)) + '" maxlength="14" autocomplete="off" placeholder="000000-0000000">';
       else if (t === 'tel') inp = '<input id="me-' + k + '" inputmode="tel" value="' + esc(fmtPhone(d.phone)) + '">';
@@ -702,7 +732,7 @@
       '<div class="mef">' + (ph ? '<a class="callb" href="tel:' + ph + '">📞 전화</a>' : '<span class="callb off">전화 없음</span>') + '<button class="btn" id="me-save">저장</button><button class="btn red" id="me-del">삭제</button></div></div>';
     el.hidden = false; document.body.classList.add('noscroll');
     var close = function () { el.hidden = true; document.body.classList.remove('noscroll'); };
-    money(['#me-daily_fee', '#me-insurance_cost', '#me-chang_fee', '#me-callmaner_cost']);
+    money(['#me-deposit_amount', '#me-daily_fee', '#me-insurance_cost', '#me-chang_fee', '#me-callmaner_cost']);
     var ssn = $('#me-ssn'); ssn.addEventListener('focus', function () { ssn.value = ssn.getAttribute('data-full') || ''; });
     ssn.addEventListener('input', function () { var x = ssn.value.replace(/[^0-9]/g, '').slice(0, 13); ssn.value = x.length > 6 ? x.slice(0, 6) + '-' + x.slice(6) : x; });
     ssn.addEventListener('blur', function () { ssn.setAttribute('data-full', ssn.value); ssn.value = maskSsn(ssn.value); });
@@ -725,7 +755,7 @@
       var jd = g('joined_at'), jv = jd === '' ? null : toDate(jd); if (jd !== '' && jv == null) { toast('가입일은 2026-10-28 형식으로 입력해 주세요'); return; }
       var total = tot(), cmp = {
         status: g('status'), joined_at: jv, emp_no: en, team: g('team') || null, name: nm, ssn: sd ? fmtSsn(sd) : null, phone: g('phone').replace(/[^0-9]/g, '') || null, ins_company: g('ins_company') || null, insurance: g('insurance') || null, deposit_group: g('deposit_group') || null, carrier: g('carrier') || null, phone_owner: g('phone_owner') || null, programs: g('programs') || null,
-        daily_fee: num(g('daily_fee')), insurance_cost: num(g('insurance_cost')), chang_fee: num(g('chang_fee')), callmaner_cost: num(g('callmaner_cost')), total_cost: total, margin: calcMargin(total, g('chang_fee'), g('insurance_cost'), g('callmaner_cost')), source: g('source') || null, note: g('note') || null };
+        deposit_amount: num(g('deposit_amount')), daily_fee: num(g('daily_fee')), insurance_cost: num(g('insurance_cost')), chang_fee: num(g('chang_fee')), callmaner_cost: num(g('callmaner_cost')), total_cost: total, margin: calcMargin(total, g('chang_fee'), g('insurance_cost'), g('callmaner_cost')), source: g('source') || null, note: g('note') || null };
       for (var k in cmp) if ((cmp[k] == null ? '' : cmp[k]) !== (d[k] == null ? '' : d[k])) upd[k] = cmp[k];
       if (!Object.keys(upd).length) { close(); return; }
       btn.disabled = true;
@@ -776,7 +806,7 @@
   function driverBrief(d) {
     if (!d) return;
     var m = $('#modal'), row = function (l, x) { return '<dt>' + l + '</dt><dd>' + esc(x == null || x === '' ? '-' : String(x)) + '</dd>'; };
-    m.innerHTML = '<div class="mbox"><h3>' + esc(d.name) + ' <span class="tag g">' + esc(d.status || '가입') + '</span></h3><dl class="kv">' + row('사번', d.emp_no) + row('가입일', d.joined_at) + row('핸드폰', fmtPhone(d.phone)) + row('통신사', d.carrier) + row('명의', d.phone_owner) + row('설치 프로그램', d.programs) + row('보험 회사', d.ins_company) + row('보험 종류', d.insurance) + row('일비', n0(d.daily_fee) + '원') + row('월 합산 비용', n0(d.total_cost) + '원') + '</dl><div class="acts"><button class="btn" id="db-go">기사 가입 현황에서 보기</button><button class="btn line" id="db-x">닫기</button></div></div>';
+    m.innerHTML = '<div class="mbox"><h3>' + esc(d.name) + ' <span class="tag g">' + esc(d.status || '가입') + '</span></h3><dl class="kv">' + row('사번', d.emp_no) + row('가입일', d.joined_at) + row('핸드폰', fmtPhone(d.phone)) + row('통신사', d.carrier) + row('명의', d.phone_owner) + row('설치 프로그램', d.programs) + row('보험 회사', d.ins_company) + row('보험 종류', d.insurance) + row('보증금', n0(d.deposit_amount) + '원') + row('일비', n0(d.daily_fee) + '원') + row('월 합산 비용', n0(d.total_cost) + '원') + '</dl><div class="acts"><button class="btn" id="db-go">기사 가입 현황에서 보기</button><button class="btn line" id="db-x">닫기</button></div></div>';
     m.hidden = false;
     $('#db-x', m).addEventListener('click', function () { m.hidden = true; });
     $('#db-go', m).addEventListener('click', function () { m.hidden = true; dfv = {}; dq = d.name; dmore = 50; dpage = 1; tab = 'drivers'; render(); });
@@ -1129,12 +1159,12 @@
         this.disabled = true;
         var recs = plan.map(function (p) {
           var o = p.o, r = { emp_no: p.no, team: '골드 2팀', joined_at: null, status: o.status || '가입', name: String(o.name).trim(), ssn: null, phone: null, ins_company: null, insurance: null, deposit_group: null, note: null, source: null,
-            daily_fee: 0, insurance_cost: 0, chang_fee: 17000, callmaner_cost: 0, total_cost: 0, margin: 0 };
+            deposit_amount: 0, daily_fee: 0, insurance_cost: 0, chang_fee: 17000, callmaner_cost: 0, total_cost: 0, margin: 0 };
           ['team', 'ins_company', 'insurance', 'deposit_group', 'note', 'source', 'carrier', 'phone_owner', 'programs'].forEach(function (k) { if (o[k] != null) { var tv = String(o[k]).trim() || null; if (tv || ['carrier', 'phone_owner', 'programs'].indexOf(k) < 0) r[k] = tv; } });
           if (o.phone != null) r.phone = String(o.phone).replace(/[^0-9]/g, '') || null;
           if (o.ssn != null) { var dg = String(o.ssn).replace(/[^0-9]/g, ''); if (dg.length === 12) dg = '0' + dg; r.ssn = dg.length === 13 ? fmtSsn(dg) : null; }
           if (o.joined_at != null) r.joined_at = toDate(o.joined_at);
-          ['daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin', 'callmaner_cost'].forEach(function (k) { var n = toInt(o[k]); if (n != null) r[k] = n; });
+          ['deposit_amount', 'daily_fee', 'insurance_cost', 'chang_fee', 'total_cost', 'margin', 'callmaner_cost'].forEach(function (k) { var n = toInt(o[k]); if (n != null) r[k] = n; });
           if (o.total_cost == null) r.total_cost = calcTotal(r.daily_fee);
           if (o.margin == null) r.margin = calcMargin(r.total_cost, r.chang_fee, r.insurance_cost, r.callmaner_cost);
           return r;
