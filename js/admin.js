@@ -14,7 +14,7 @@
   var PAY = { none: '-', requested: '안내 요청', paid: '결제 완료' }, LIC = { none: '미제출', submitted: '제출됨', confirmed: '확인 완료' };
   var APPN = { logi: '로지', callmaner: '콜마너', aicon: '아이콘', tmap: '티맵대리', kakao: '카카오T대리', handle: '핸들포유', none: '처음입니다' };
   var CAR = { SKT: 'SK', KT: 'KT', LGU: 'U+', SKT_MVNO: 'SK알뜰폰', KT_MVNO: 'KT알뜰폰', LGU_MVNO: 'U+알뜰폰' }, OWN = { self: '본인 명의', other: '타인 명의' };
-  var TABS = [['home', '오늘 할 일'], ['apps', '가입 신청'], ['drivers', '기사 가입 현황'], ['stats', '통계'], ['log', '처리 기록'], ['claim', '보험사 사고접수']];
+  var TABS = [['home', '오늘 할 일'], ['apps', '가입 신청'], ['drivers', '기사 가입 현황'], ['stats', '통계'], ['rates', '보험료 계산'], ['log', '처리 기록'], ['claim', '보험사 사고접수']];
   var BNAV = [['home', '오늘 할 일', '☑'], ['apps', '가입 신청', '📝'], ['drivers', '기사', '👤'], ['more', '더보기', '⋯']];
   var OWNER_EMAIL = 'bbw135@gmail.com';
   var histOn = false, curTab = 'home', fromPop = false, exitArm = false, skipPop = 0, popClosing = false, ovStack = [];
@@ -119,11 +119,194 @@
     $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '">' + t[1] + (t[0] === 'apps' && badge ? '<span class="dot">' + badge + '</span>' : '') + '</button>'; }).join('');
     $$('#tabs button').forEach(function (b) { b.addEventListener('click', function () { tab = b.getAttribute('data-t'); render(); }); });
     var v = $('#view'), bn = $('#bnav'), mm = isM();
-    bn.innerHTML = BNAV.map(function (t) { var on = tab === t[0] || (t[0] === 'more' && (tab === 'stats' || tab === 'log' || tab === 'claim')); return '<button data-b="' + t[0] + '" class="' + (on ? 'on' : '') + '"><i>' + t[2] + '</i>' + t[1] + (t[0] === 'apps' && badge ? '<span class="dot">' + badge + '</span>' : '') + '</button>'; }).join('');
+    bn.innerHTML = BNAV.map(function (t) { var on = tab === t[0] || (t[0] === 'more' && (tab === 'stats' || tab === 'rates' || tab === 'log' || tab === 'claim')); return '<button data-b="' + t[0] + '" class="' + (on ? 'on' : '') + '"><i>' + t[2] + '</i>' + t[1] + (t[0] === 'apps' && badge ? '<span class="dot">' + badge + '</span>' : '') + '</button>'; }).join('');
     $$('#bnav button').forEach(function (b) { b.addEventListener('click', function () { tab = b.getAttribute('data-b'); window.scrollTo(0, 0); render(); }); });
     $('#main').classList.toggle('mfull', mm && (tab === 'drivers' || tab === 'stats' || tab === 'more')); $('#main').classList.toggle('wide', tab === 'drivers'); $('#main').classList.toggle('dfix', !mm && (tab === 'drivers' || tab === 'stats'));
     if (tab === 'more' && !mm) tab = 'home';
-    ({ home: viewHome, apps: viewApps, drivers: mm ? viewDriversM : viewDrivers, stats: viewStats, more: viewMore, pay: viewPay, log: viewLog, claim: viewClaim })[tab](v);
+    ({ home: viewHome, apps: viewApps, drivers: mm ? viewDriversM : viewDrivers, stats: viewStats, rates: viewRates, more: viewMore, pay: viewPay, log: viewLog, claim: viewClaim })[tab](v);
+  }
+
+  /* ---------- v3.1 보험료 계산 ---------- */
+  var RATE_KEY = 'rates';
+  var RATE_DEF = {
+    rentAdd: 400,
+    msgM: '실제 보험료는 나이와 사고, 경력 등에 따라 달라질 수 있습니다. 정확한 금액은 사무실에 문의 바랍니다.',
+    msgG: '실제 보험료는 나이와 사고, 경력 등에 따라 달라질 수 있습니다. 정확한 금액은 각 보험사에 문의 바랍니다.',
+    msgNone: '현재 가입 가능한 보험 상품이 없습니다',
+    monthly: [
+      { from: 26, to: 29, kb: false, dDaily: 4700, dAuto: false, dLo: 78000, dHi: 89000, dSuf: ' 전후', tDaily: 6700, tAuto: false, tLo: 138000, tHi: 153000, tSuf: ' 전후', tTxt: '' },
+      { from: 30, to: 50, kb: true, dDaily: 3700, dAuto: true, dSuf: ' (3,500원 가능)', tDaily: 5500, tAuto: true, tSuf: ' 전후', tTxt: '' },
+      { from: 51, to: 56, kb: true, dDaily: 4500, dAuto: true, dSuf: ' 전후', tDaily: 7500, tAuto: true, tSuf: ' 전후', tTxt: '' },
+      { from: 57, to: 66, kb: true, dDaily: 5100, dAuto: true, dSuf: ' 전후', tDaily: 9000, tAuto: true, tSuf: ' 전후', tTxt: '' },
+      { from: 67, to: null, kb: true, dDaily: 5500, dAuto: false, dLo: null, dHi: null, dSuf: ' 전후', tDaily: 0, tAuto: false, tLo: null, tHi: null, tSuf: '', tTxt: '보험 진행 후 확인 가능 (약 10,000원 전후)' }
+    ],
+    logi: {
+      dae: [['만 40세 이하', 821, 1026, 913, 1136], ['만 49세 이하', 821, 985, 876, 1095], ['만 58세 이하', 1083, 1321, 1175, 1431], ['만 59세 이상', 1627, 1871, 1665, 1981]],
+      tak: [['만 40세 이하', 4218, 4259, 3788], ['만 49세 이하', 3278, 3393, 3016], ['만 58세 이하', 4560, 4606, 4095], ['만 59세 이상', 5019, 5170, 4596]]
+    },
+    col: [
+      { name: 'KB 건당대리', title: 'KB 손해보험(대리보험) 안내', head: '완료 오더당 나이별 금액', dual: false, rows: [['28세 이하', 1849], ['29세 ~ 40세', 1150], ['41세 ~ 49세', 1369], ['50세 ~ 58세', 1463], ['59세 이상', 1991]],
+        text: '* 사고 건수에 따라 보험료가 할증될 수 있습니다.\n2. 할증 보험료 문의처: 1877-3006\n3. 보험가입 신청 후 평일 최대 2일 소요\n- 심사결과 수신 후 24:00 보험적용\n- 토, 일요일 신청불가\n4. 사고 콜센터: 1544-0114\n5. 심사 거절 상담: 1877-3006\n6. 개인정보 제공지사\n- 상호: KB손해보험\n- 주소: 서울 강남구 테헤란로 117, KB손해보험빌딩' },
+      { name: 'KB 건당대리 (렌터카 특약 포함)', title: 'KB 손해보험(대리보험-렌터카특약 포함) 안내', head: '완료 오더당 나이별 금액', dual: false, rows: [['28세 이하', 1959], ['29세 ~ 40세', 1260], ['41세 ~ 49세', 1479], ['50세 ~ 58세', 1573], ['59세 이상', 2101]],
+        text: '* 사고 건수에 따라 보험료가 할증될 수 있습니다.\n2. 보장 범위\n- 지급 조건: 차량손해확장 특약으로 보험금이 지급되는 사고 발생 시에만 적용\n- 렌터카 대차 시: 동급 렌터카 요금 × 인정기간 지급\n- 렌터카 미대차 시: 동급 렌트비용의 30% 상당액 지급\n- 인정기간\n  · 수리 가능한 경우: 실 수리 기간 동안 인정. 단, 최대 30일까지 인정(외국산 자동차의 부품 조달 기간 및 합의 지연, 부당한 수리지연에 따른 연장 기간은 인정하지 않음)\n  · 수리가 불가능한 경우: 최대 10일까지 인정\n  · 도난의 경우: 경찰서 신고일로부터 30일까지 인정\n3. 대상 차량 (동급 렌터카 기준)\n- 대한민국에서 생산된 자동차\n- 피보험자동차와 연식·배기량 유사 차량\n- 여객자동차운수사업법 제29조 등록 렌터카 사업자 차량\n4. 할증 보험료 문의처: 1877-3006\n5. 보험가입 신청 후 평일 최대 2일 소요\n- 심사결과 수신 후 24:00 보험적용\n- 토, 일요일 신청불가\n6. 사고 콜센터: 1544-0114\n7. 심사 거절 상담: 1877-3006\n8. 개인정보 제공지사\n- 상호: KB손해보험\n- 주소: 서울 강남구 테헤란로 117, KB손해보험빌딩\n개인정보 제공 항목: 성명, 주민등록번호, 휴대폰번호' },
+      { name: '메리츠 건당대리', title: '메리츠 손해보험(대리보험) 안내', head: '완료 오더당 나이별 금액', dual: true, rows: [['26세 ~ 29세', 1420, '26세 ~ 29세', 1300], ['30세 ~ 39세', 1160, '30세 ~ 39세', 880], ['40세 ~ 49세', 1000, '40세 ~ 49세', 960], ['50세 ~ 59세', 1480, '50세 ~ 59세', 1100], ['60세 ~ 63세', 1980, '60세 ~ 63세', 1740]],
+        text: '*사고 건수에 따라 보험료가 할증될 수 있습니다.\n2. 할증 보험료 문의처: 1877-3006\n3. 보험가입 신청 후 평일 최대 2일 소요\n- 심사결과 수신 후 24:00 보험적용\n- 토, 일요일 신청불가\n4. 사고 콜센터: 1566-7711\n5. 심사 거절 상담: 1877-3006\n6. 개인정보 제공지사\n- 상호: 메리츠화재 해상 주식회사\n- 주소: 서울 강남구 강남대로382(역삼동) 메리츠타워\n개인정보 제공 항목: 성명, 주민등록번호, 휴대전화번호' },
+      { name: 'KB 건당탁송', title: 'KB 손해보험(탁송보험) 안내', head: '탁송콜당 보험료', dual: false, rows: [['28세 이하', 5251], ['29세 ~ 40세', 4953], ['41세 ~ 49세', 4205], ['50세 ~ 58세', 5692], ['59세 이상', 7077]],
+        text: '* 사고 건수에 따라 보험료가 할증될 수 있습니다.\n2. 차량운행 전 사진 촬영 필수\n- 차량운행 "운행 전", "완료 전" 사진을 찍어 전송해야 보상이 이루어집니다.\n3. 운행 가능 차량\n- 1종대형: 모든 승용차 / 1.4톤 이하 화물차 / 승차정원 16인승 이하\n- 1종보통: 모든 승용차 / 1.4톤 이하 화물차 / 승차정원 16인승 이하\n- 1종특수 & 2종보통 : 모든 승용차 / 1.4톤 이하 화물차 / 승차정원 10인승 이하\n※ 노란색 번호판이 부착된 영업용 차량 운행 불가\n4. 보장 범위\n- 담보 범위: 탁송 운전 중 발생한 사고 담보 (발렛 제외)\n- 보상 범위\n  · 대인배상책임: 무한 (고객 자동차 보험 대인1 초과 손해 보장)\n  · 대물배상책임 : 2억원 (고객의 자동차 이외 대물 손해 보장)\n  · 자기신체사고 : 5천만원 (대리운전 기사 상해, 후유장해 보장)\n  · 자차손해보장 : 8천만원 (고객 차량 손해 보장)\n  · Umbrella 보장 : 고객 자동차 자차 외 손해 보장\n5. 공제금액\n- 자차손해보장: 50만원\n- 고객 자동차 자차 외 손해: 50만원 (Umbrella)\n6. 면책 사항\n- 무면허, 음주운전\n- 경기용 차량\n- 여객운송, 화물운송 등\n- 가족 소유 차량\n- 수탁 차량 도난 손해\n7. 보험가입 신청 최대 평일 2일 소요\n- 심사결과 수신 후 24:00 보험적용\n- 토, 일요일 신청불가\n8. 사고 접수 및 상담\n- 사고 콜센터: 1544-0114\n- 보험 심사 거절 상담: 1877-3006\n9. 개인정보 제공 지사\n- 상호: KB손해보험\n- 주소: 서울 강남구 테헤란로 117, KB손해보험빌딩\n개인정보 제공 항목: 성명, 주민등록번호, 휴대폰번호' },
+      { name: '메리츠 건당탁송', title: '메리츠 손해보험(탁송보험) 안내', head: '탁송콜당 보험료', dual: true, rows: [['26세 ~ 31세', 8400, '26세 ~ 31세', 5470], ['32세 ~ 39세', 6130, '32세 ~ 39세', 4000], ['40세 ~ 49세', 5890, '40세 ~ 49세', 4230], ['50세 ~ 59세', 5810, '50세 ~ 59세', 5970]],
+        text: '2. 차량운행 전 사진 촬영 필수\n- 차량운행 "운행 전", "완료 전" 사진을 찍어 전송해야 보상이 이루어집니다.\n3. 운행 가능 차량\n- 1종대형: 모든 승용차 / 1.4톤 이하 화물차 / 승차정원 16인승 이하\n- 1종보통: 모든 승용차 / 1.4톤 이하 화물차 / 승차정원 16인승 이하\n- 1종특수 & 2종보통 : 모든 승용차 / 1.4톤 이하 화물차 / 승차정원 10인승 이하\n※ 노란색 번호판이 부착된 영업용 차량 운행 불가\n4. 보장 범위\n- 담보 범위: 탁송 운전 중 발생한 사고 담보 (발렛 제외)\n- 보상 범위\n  · 대인배상책임: 무한 (고객 자동차 보험 대인1 초과 손해 보장)\n  · 대물배상책임 : 2억원 (고객의 자동차 이외 대물 손해 보장)\n  · 자기신체사고 : 5천만원 (대리운전 기사 상해, 후유장해 보장)\n  · 자차손해보장 : 8천만원 (고객 차량 손해 보장)\n  · Umbrella 보장 : 고객 자동차 자차 외 손해 보장\n5. 공제금액\n- 자차손해보장: 50만원\n- 고객 자동차 자차 외 손해: 50만원 (Umbrella)\n6. 면책 사항\n- 무면허, 음주운전\n- 경기용 차량\n- 여객운송, 화물운송 등\n- 가족 소유 차량\n- 수탁 차량 도난 손해\n7. 사고 접수 및 상담\n- 사고 콜센터: 1566-4982\n- 보험 심사 거절 상담: 070-7841-5963\n- 문자 상담: 010-4819-0574\n8. 개인정보 제공 지사\n- 메리츠화재해상 주식회사\n- 서울 강남구 강남대로 382 (역삼동) 메리츠타워\n- 1566-7711\n개인정보 제공 항목: 성명, 주민등록번호, 휴대폰번호' }
+    ]
+  };
+  var RATES = null, rs = { kind: '', by: '', bm: '', prog: '', sub: 0, edit: false, ed: null };
+  function cp(o) { return JSON.parse(JSON.stringify(o)); }
+  function loadRates() {
+    if (RATES) return Promise.resolve(RATES);
+    return sb.from('golddriver_settings').select('value').eq('key', RATE_KEY).maybeSingle().then(function (r) {
+      var v = r && r.data && r.data.value, o = cp(RATE_DEF);
+      if (v && typeof v === 'object') { for (var k in v) o[k] = v[k]; }
+      RATES = o; return o;
+    }, function () { RATES = cp(RATE_DEF); return RATES; });
+  }
+  function ageOf(y, m) { var t = new Date(), a = t.getFullYear() - y; if (t.getMonth() + 1 < m) a--; return a; }
+  var DDI = ['쥐', '소', '호랑이', '토끼', '용', '뱀', '말', '양', '원숭이', '닭', '개', '돼지'];
+  function ddi(y) { return y + '년생 ' + DDI[(y - 4) % 12] + '띠'; }
+  function won(x) { return n0(x) + '원'; }
+  function rangeTxt(lo, hi) { return lo && hi && lo !== hi ? n0(lo) + ' ~ ' + n0(hi) : lo ? n0(lo) : ''; }
+  function mBracket(R, age) { var i; for (i = 0; i < R.monthly.length; i++) { var b = R.monthly[i]; if (age >= b.from && (b.to == null || age <= b.to)) return b; } return null; }
+  function bTitle(b) { return b.kb === false ? '만 ' + b.to + '세 이하는 KB 가입 불가' : b.to == null ? '만 ' + b.from + '세 이상 ~' : '만 ' + b.from + '세 이상 ~ 만 ' + b.to + '세 이하'; }
+  function bYears(b) { var y = new Date().getFullYear(); return b.to == null ? '(' + ddi(y - b.from) + ' ~ )' : '(' + ddi(y - b.from) + ' ~ ' + ddi(y - b.to) + ')'; }
+  function bCalc(b, R, rent) {
+    var add = rent ? num(R.rentAdd) : 0, o = {};
+    ['d', 't'].forEach(function (p) {
+      var daily = num(b[p + 'Daily']), lo, hi;
+      if (b[p + 'Auto']) { lo = hi = daily * 30; } else { lo = b[p + 'Lo'] || 0; hi = b[p + 'Hi'] || 0; }
+      var show = !(p === 't' && b.tTxt);
+      o[p] = { daily: daily ? daily + add : 0, lo: lo ? lo + add * 30 : 0, hi: hi ? hi + add * 30 : 0, show: show };
+    });
+    return o;
+  }
+  function mLines(b, R) {
+    var d = bCalc(b, R, false), r = bCalc(b, R, true), L = [];
+    if (b.kb === false) L.push('<b>DB손보(동부) 가입, 다율 개인보험 (만 ' + b.from + '세 ~ 만 ' + b.to + '세까지)</b>');
+    var dm = rangeTxt(d.d.lo, d.d.hi), tm = rangeTxt(d.t.lo, d.t.hi);
+    if (b.kb === false) { L.push('대리 보험료 ' + dm + ' / 일비 ' + won(d.d.daily) + esc(b.dSuf || '')); L.push('탁송 보험료 ' + tm + ' / 일비 ' + won(d.t.daily) + esc(b.tSuf || '')); }
+    else { L.push('대리는 ' + won(d.d.daily) + esc(b.dSuf || '') + (dm ? ' / ' + dm + '원' : '')); L.push(b.tTxt ? '탁송은 ' + esc(b.tTxt) : '탁송은 ' + won(d.t.daily) + esc(b.tSuf || '') + (tm ? ' / ' + tm + '원' : '')); }
+    return L;
+  }
+  function mCard(t, b, R, rent, kind) {
+    var c = bCalc(b, R, rent)[kind], sfx = kind === 'd' ? b.dSuf : b.tSuf, m = rangeTxt(c.lo, c.hi); if (rent && sfx && sfx.indexOf('(') >= 0) sfx = '';
+    var body = kind === 't' && b.tTxt ? esc(b.tTxt) + (rent ? '<br><span class="mut">렌터카 포함도 확인 후 안내</span>' : '') : '일비 ' + won(c.daily) + esc(sfx || '') + (m ? '<br><b class="rt">월 ' + m + '원</b>' : '');
+    return '<div class="mini"><b>' + t + (rent ? ' <span class="pl">렌터카 포함</span>' : '') + '</b>' + body + '</div>';
+  }
+  function ptext(t) { return esc(t).split('\n').map(function (l) { return /^\d+\.\s/.test(l) ? '<div class="pt h">' + l + '</div>' : '<div class="pt">' + l.replace(/^ {2}/, '&nbsp;&nbsp;&nbsp;') + '</div>'; }).join(''); }
+  function colCard(p) {
+    var h = '<div class="cd"><h4>' + esc(p.title) + '</h4><div class="info" style="margin:0 0 6px">1. ' + esc(p.head) + '</div><table class="sm"><tr><th>' + (p.dual ? '수도권' : '수도권/지방권') + '</th><th></th>' + (p.dual ? '<th>지방권</th><th></th>' : '') + '</tr>';
+    p.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td>' + won(r[1]) + '</td>' + (p.dual ? '<td>' + esc(r[2]) + '</td><td>' + won(r[3]) + '</td>' : '') + '</tr>'; });
+    return h + '</table><div class="ptx">' + ptext(p.text) + '</div></div>';
+  }
+  function logiCard(title, rows, withRent) {
+    var h = '<div class="cd"><h4>' + title + '</h4><table class="sm"><tr><th>연령</th><th>기존</th><th>변경</th><th>무사고 경력자 최저</th>' + (withRent ? '<th>렌터카 특약 포함</th>' : '') + '</tr>';
+    rows.forEach(function (r) { h += '<tr><td><b>' + esc(r[0]) + '</b></td><td><span class="old">' + n0(r[1]) + '</span></td><td>' + n0(r[2]) + '<span class="up">인상</span></td><td class="g">' + n0(r[3]) + '</td>' + (withRent ? '<td class="rt">' + n0(r[4]) + '</td>' : '') + '</tr>'; });
+    return h + '</table></div>';
+  }
+  function rEd(path, val, w) { return '<input class="ri" data-p="' + path + '" value="' + (val == null ? '' : n0(val)) + '" inputmode="numeric" style="width:' + (w || 84) + 'px">'; }
+  function rTx(path, val, w) { return '<input class="rt2" data-p="' + path + '" data-s="1" value="' + esc(val == null ? '' : val) + '" style="width:' + (w || 120) + 'px">'; }
+  function rYear(y) { var o = '<option value="">년도 선택</option>', t = new Date().getFullYear(), i; for (i = t - 15; i >= t - 90; i--) o += '<option value="' + i + '"' + (String(y) === String(i) ? ' selected' : '') + '>' + i + '년</option>'; return o; }
+  function rMon(m) { var o = '<option value="">월</option>', i; for (i = 1; i <= 12; i++) o += '<option value="' + i + '"' + (String(m) === String(i) ? ' selected' : '') + '>' + i + '월</option>'; return o; }
+  function rView(R) {
+    var h = '<div class="lbl">보험 종류</div><div class="seg"><span data-k="m" class="' + (rs.kind === 'm' ? 'on' : '') + '">월보험</span><span data-k="g" class="' + (rs.kind === 'g' ? 'on' : '') + '">건당보험</span></div>';
+    if (rs.kind === 'm') {
+      h += '<div class="lbl">생년월 선택</div><div class="rsel"><select id="r-by">' + rYear(rs.by) + '</select><select id="r-bm">' + rMon(rs.bm) + '</select>';
+      if (rs.by && rs.bm) { var age = ageOf(+rs.by, +rs.bm); h += '<span class="age">만 ' + age + '세</span>'; }
+      h += '</div>';
+      if (rs.by && rs.bm) {
+        var b = age >= 0 ? mBracket(R, age) : null;
+        if (!b) h += '<div class="emp">' + esc(R.msgNone) + '</div>';
+        else {
+          h += '<div class="g4"><div class="bx hl"><span class="k"><u>' + bTitle(b) + '</u></span><br>&nbsp;&nbsp;' + bYears(b) + mLines(b, R).map(function (l) { return '<br>- ' + l; }).join('') + '</div><div class="g4">' + mCard('월보험 대리', b, R, false, 'd') + mCard('월보험 대리', b, R, true, 'd') + mCard('월보험 탁송', b, R, false, 't') + mCard('월보험 탁송', b, R, true, 't') + '</div></div>';
+          h += '<div class="wn">※ ' + esc(R.msgM) + '</div><div><button class="btn line" id="r-all">' + (rs.all ? '▴ 전체 연령 구간 접기' : '▾ 전체 연령 구간 보기') + '</button></div>';
+          if (rs.all) h += rAll(R);
+        }
+      } else h += '<div class="emp">생년월을 선택하면 만 나이와 월보험 안내가 표시돼요</div>';
+    } else if (rs.kind === 'g') {
+      h += '<div class="lbl">프로그램 선택</div>' + [['logi', '로지'], ['col', '콜마너'], ['icon', '아이콘']].map(function (x) { return '<span class="chip' + (rs.prog === x[0] ? ' on' : '') + '" data-pg="' + x[0] + '">' + x[1] + '</span>'; }).join('');
+      if (rs.prog) {
+        h += '<div class="wn" style="margin-top:12px">※ ' + esc(R.msgG) + '</div>';
+        if (rs.prog === 'logi') { h += '<div class="info" style="margin:6px 0">연령별 보험료 변경 내역 (단위: 원)</div><div class="g2">' + logiCard('● 건당대리', R.logi.dae, true) + logiCard('● 건당탁송', R.logi.tak, false) + '</div>'; }
+        else { h += '<div class="lbl">보험사 · 종류</div>' + R.col.map(function (p, i) { return '<span class="chip' + (rs.sub === i ? ' on' : '') + '" data-sb="' + i + '">' + esc(p.name) + '</span>'; }).join('') + colCard(R.col[rs.sub] || R.col[0]); }
+      } else h += '<div class="emp" style="margin-top:12px">프로그램을 선택해 주세요</div>';
+    } else h += '<div class="emp" style="margin-top:12px">보험 종류를 선택해 주세요</div>';
+    return h;
+  }
+  function rAll(R) {
+    return '<div class="g2" style="margin-top:12px">' + R.monthly.map(function (b, i) {
+      var d = bCalc(b, R, false), r = bCalc(b, R, true), L = mLines(b, R), rl = [];
+      if (b.kb === false) { rl.push('렌터카 포함 일비 ' + won(r.d.daily) + ' / 탁송 ' + won(r.t.daily)); }
+      else { rl.push('대리 렌터카 포함 ' + won(r.d.daily) + (rangeTxt(r.d.lo, r.d.hi) ? ' / ' + rangeTxt(r.d.lo, r.d.hi) + '원' : '')); rl.push(b.tTxt ? '탁송 렌터카 포함은 확인 후 안내' : '탁송 렌터카 포함 ' + won(r.t.daily) + (rangeTxt(r.t.lo, r.t.hi) ? ' / ' + rangeTxt(r.t.lo, r.t.hi) + '원' : '')); }
+      return '<div class="bx"><span class="k"><u>' + (i + 1) + ') ' + bTitle(b) + '</u></span><br>&nbsp;&nbsp;' + bYears(b) + L.map(function (l) { return '<br>- ' + l; }).join('') + rl.map(function (l) { return '<br><span class="rt">· ' + l + '</span>'; }).join('') + '</div>';
+    }).join('') + '</div>';
+  }
+  function rEdit(R) {
+    var h = '<div class="seg"><span data-k="m" class="' + (rs.kind === 'm' ? 'on' : '') + '">월보험</span><span data-k="g" class="' + (rs.kind === 'g' ? 'on' : '') + '">건당보험</span><span data-k="t" class="' + (rs.kind === 't' ? 'on' : '') + '">안내 문구</span></div>';
+    if (rs.kind === 'm') {
+      h += '<div style="margin:12px 0">렌터카 포함 가산액 (일비 기준) ' + rEd('rentAdd', R.rentAdd, 70) + ' 원 <span class="mut">→ 월 금액은 가산액 × 30 (400원이면 월 +12,000원)</span></div><div class="tw"><table class="sm"><tr><th>나이(만) 부터~까지</th><th>대리 일비</th><th>대리 비고</th><th>대리 월 금액</th><th>대리 렌터카 일비</th><th>대리 렌터카 월</th><th>탁송 일비</th><th>탁송 월 금액</th><th>탁송 렌터카 일비</th><th>탁송 렌터카 월</th></tr>';
+      R.monthly.forEach(function (b, i) {
+        var d = bCalc(b, R, false), r = bCalc(b, R, true), P = 'monthly.' + i + '.';
+        var dm = b.dAuto ? '<span class="ea">' + n0(d.d.lo) + '</span>' : rEd(P + 'dLo', b.dLo, 76) + '~' + rEd(P + 'dHi', b.dHi, 76);
+        var tm = b.tTxt ? rTx(P + 'tTxt', b.tTxt, 150) : b.tAuto ? '<span class="ea">' + n0(d.t.lo) + '</span>' : rEd(P + 'tLo', b.tLo, 76) + '~' + rEd(P + 'tHi', b.tHi, 76);
+        h += '<tr><td>' + rEd(P + 'from', b.from, 40) + '~' + (b.to == null ? '<span class="mut">이상</span>' : rEd(P + 'to', b.to, 40)) + '</td><td>' + rEd(P + 'dDaily', b.dDaily, 70) + '</td><td>' + rTx(P + 'dSuf', b.dSuf, 110) + '</td><td>' + dm + '</td><td><span class="ea">' + n0(r.d.daily) + '</span></td><td><span class="ea">' + rangeTxt(r.d.lo, r.d.hi) + '</span></td><td>' + (b.tTxt ? '<span class="mut">-</span>' : rEd(P + 'tDaily', b.tDaily, 70)) + '</td><td>' + tm + '</td><td><span class="ea">' + (b.tTxt ? '-' : n0(r.t.daily)) + '</span></td><td><span class="ea">' + (b.tTxt ? '-' : rangeTxt(r.t.lo, r.t.hi)) + '</span></td></tr>';
+      });
+      h += '</table></div><div class="info">※ 파란 칸만 입력하세요. 회색(자동) 칸은 저절로 계산돼요. 일비를 바꾸면 월 금액(일비×30)과 렌터카 포함 금액이 같이 바뀌어요. 만 29세 이하처럼 월 금액이 범위인 구간은 월 금액을 직접 입력하세요. 띠·출생연도 문구는 오늘 날짜로 자동 계산돼요.</div>';
+    } else if (rs.kind === 'g') {
+      h += '<div class="lbl">프로그램 선택</div>' + [['logi', '로지'], ['col', '콜마너'], ['icon', '아이콘']].map(function (x) { return '<span class="chip' + (rs.prog === x[0] ? ' on' : '') + '" data-pg="' + x[0] + '">' + x[1] + '</span>'; }).join('');
+      if (rs.prog === 'logi') {
+        h += '<div class="g2" style="margin-top:10px"><div class="cd"><h4>● 건당대리</h4><div class="tw"><table class="sm"><tr><th>연령</th><th>기존</th><th>변경</th><th>무사고 최저</th><th>렌터카 포함</th></tr>' + R.logi.dae.map(function (r, i) { var P = 'logi.dae.' + i + '.'; return '<tr><td>' + rTx(P + '0', r[0], 100) + '</td><td>' + rEd(P + '1', r[1], 64) + '</td><td>' + rEd(P + '2', r[2], 64) + '</td><td>' + rEd(P + '3', r[3], 64) + '</td><td>' + rEd(P + '4', r[4], 64) + '</td></tr>'; }).join('') + '</table></div></div><div class="cd"><h4>● 건당탁송</h4><div class="tw"><table class="sm"><tr><th>연령</th><th>기존</th><th>변경</th><th>무사고 최저</th></tr>' + R.logi.tak.map(function (r, i) { var P = 'logi.tak.' + i + '.'; return '<tr><td>' + rTx(P + '0', r[0], 100) + '</td><td>' + rEd(P + '1', r[1], 64) + '</td><td>' + rEd(P + '2', r[2], 64) + '</td><td>' + rEd(P + '3', r[3], 64) + '</td></tr>'; }).join('') + '</table></div></div></div>';
+      } else if (rs.prog) {
+        h += '<div class="info" style="margin:8px 0">' + (rs.prog === 'icon' ? '아이콘은 콜마너와 같은 금액·문구를 사용해요. 아래에서 수정하면 콜마너·아이콘 모두 바뀌어요.' : '') + '</div><div class="lbl">보험사 · 종류</div>' + R.col.map(function (p, i) { return '<span class="chip' + (rs.sub === i ? ' on' : '') + '" data-sb="' + i + '">' + esc(p.name) + '</span>'; }).join('');
+        var p = R.col[rs.sub] || R.col[0], i2 = R.col.indexOf(p), P = 'col.' + i2 + '.';
+        h += '<div class="cd"><h4>' + rTx(P + 'title', p.title, 360) + '</h4><div class="info">표 제목 ' + rTx(P + 'head', p.head, 200) + '</div><div class="tw"><table class="sm"><tr><th>' + (p.dual ? '수도권' : '수도권/지방권') + '</th><th>금액</th>' + (p.dual ? '<th>지방권</th><th>금액</th>' : '') + '</tr>' + p.rows.map(function (r, j) { var Q = P + 'rows.' + j + '.'; return '<tr><td>' + rTx(Q + '0', r[0], 110) + '</td><td>' + rEd(Q + '1', r[1], 78) + ' 원</td>' + (p.dual ? '<td>' + rTx(Q + '2', r[2], 110) + '</td><td>' + rEd(Q + '3', r[3], 78) + ' 원</td>' : '') + '</tr>'; }).join('') + '</table></div><div class="lbl">하단 안내 문구 (줄바꿈 그대로 표시)</div><textarea class="rta" data-p="' + P + 'text" data-s="1" rows="12">' + esc(p.text) + '</textarea></div>';
+      } else h += '<div class="emp" style="margin-top:12px">수정할 프로그램을 선택해 주세요</div>';
+    } else {
+      h += '<div class="lbl">월보험 안내 문구 (맨 위)</div><textarea class="rta" data-p="msgM" data-s="1" rows="2">' + esc(R.msgM) + '</textarea><div class="lbl">건당보험 안내 문구 (로지 · 콜마너 · 아이콘 공통)</div><textarea class="rta" data-p="msgG" data-s="1" rows="2">' + esc(R.msgG) + '</textarea><div class="lbl">만 26세 미만 등 해당 구간이 없을 때 문구</div><textarea class="rta" data-p="msgNone" data-s="1" rows="2">' + esc(R.msgNone) + '</textarea>';
+    }
+    return h;
+  }
+  function rSet(o, path, val) { var k = path.split('.'), i; for (i = 0; i < k.length - 1; i++) o = o[k[i]]; o[k[k.length - 1]] = val; }
+  function rDiff(a, b) { var n = 0, k; if (a && typeof a === 'object') { for (k in a) n += rDiff(a[k], b ? b[k] : undefined); return n; } return a !== b ? 1 : 0; }
+  function viewRates(v) {
+    loadRates().then(function (R0) {
+      var R = rs.edit ? rs.ed : R0;
+      v.innerHTML = '<div class="rhead"><h2>보험료 계산' + (rs.edit ? ' · 금액 수정' : '') + '</h2><div class="acts" style="margin:0">' + (rs.edit ? '<button class="btn" id="r-save">저장</button><button class="btn line" id="r-cancel">취소</button><button class="btn red" id="r-reset">기본값으로 되돌리기</button>' : '<button class="btn line" id="r-edit">✎ 금액 수정</button>') + '</div></div><div class="panel rpanel">' + (rs.edit ? rEdit(R) : rView(R)) + '</div>';
+      $$('.seg span', v).forEach(function (s) { s.addEventListener('click', function () { rs.kind = s.getAttribute('data-k'); rs.prog = ''; viewRates(v); }); });
+      $$('[data-pg]', v).forEach(function (s) { s.addEventListener('click', function () { rs.prog = s.getAttribute('data-pg'); rs.sub = 0; viewRates(v); }); });
+      $$('[data-sb]', v).forEach(function (s) { s.addEventListener('click', function () { rs.sub = +s.getAttribute('data-sb'); viewRates(v); }); });
+      if (!rs.edit) {
+        var by = $('#r-by', v), bm = $('#r-bm', v);
+        if (by) { by.addEventListener('change', function () { rs.by = by.value; viewRates(v); }); bm.addEventListener('change', function () { rs.bm = bm.value; viewRates(v); }); }
+        var al = $('#r-all', v); if (al) al.addEventListener('click', function () { rs.all = !rs.all; viewRates(v); });
+        $('#r-edit', v).addEventListener('click', function () { rs.edit = true; rs.ed = cp(RATES); if (!rs.kind || rs.kind === '') rs.kind = 'm'; viewRates(v); });
+      } else {
+        $$('.ri', v).forEach(function (i) { i.addEventListener('input', function () { var d = i.value.replace(/[^0-9]/g, ''); i.value = d ? Number(d).toLocaleString('ko-KR') : ''; });
+          i.addEventListener('change', function () { rSet(rs.ed, i.getAttribute('data-p'), i.value === '' ? null : num(i.value)); viewRates(v); }); });
+        $$('[data-s]', v).forEach(function (i) { i.addEventListener('change', function () { rSet(rs.ed, i.getAttribute('data-p'), i.value); viewRates(v); }); });
+        $('#r-cancel', v).addEventListener('click', function () { rs.edit = false; rs.ed = null; viewRates(v); });
+        $('#r-reset', v).addEventListener('click', function () { var m = $('#modal'); m.innerHTML = '<div class="mbox"><h3>기본값으로 되돌릴까요?</h3><div class="mut">처음 금액(이미지 금액)으로 화면만 되돌려요. 「저장」을 눌러야 실제로 반영돼요.</div><div class="acts"><button class="btn" id="rr-ok">되돌리기</button><button class="btn line" id="rr-no">취소</button></div></div>'; m.hidden = false; $('#rr-no').addEventListener('click', function () { m.hidden = true; }); $('#rr-ok').addEventListener('click', function () { rs.ed = cp(RATE_DEF); m.hidden = true; viewRates(v); }); });
+        $('#r-save', v).addEventListener('click', function () {
+          var n = rDiff(rs.ed, RATES), m = $('#modal');
+          if (!n) { toast('바뀐 내용이 없어요'); return; }
+          m.innerHTML = '<div class="mbox"><h3>저장할까요?</h3><div class="mut">보험료 금액·문구 ' + n + '곳이 바뀌었어요. 저장하면 모든 관리자 화면에 바로 반영돼요.</div><div class="acts"><button class="btn" id="rs-ok">저장</button><button class="btn line" id="rs-no">계속 수정</button></div></div>'; m.hidden = false;
+          $('#rs-no').addEventListener('click', function () { m.hidden = true; });
+          $('#rs-ok').addEventListener('click', function () {
+            this.disabled = true;
+            sb.from('golddriver_settings').upsert({ key: RATE_KEY, value: rs.ed, updated_by: adminName, updated_at: new Date().toISOString() }).then(function (r) {
+              if (r.error) { toast('저장 실패: ' + r.error.message + ' (SQL v3.1을 실행했는지 확인해 주세요)', 6000); $('#rs-ok').disabled = false; return; }
+              RATES = cp(rs.ed); rs.edit = false; rs.ed = null; m.hidden = true; toast('저장했어요');
+              logAct('보험료 수정 (' + n + '곳)').then(function () { loadAll().then(function () { viewRates(v); }); });
+            });
+          });
+        });
+      }
+    });
   }
 
   /* ---------- 오늘 할 일 ---------- */
@@ -812,13 +995,13 @@
     $('#db-go', m).addEventListener('click', function () { m.hidden = true; dfv = {}; dq = d.name; dmore = 50; dpage = 1; tab = 'drivers'; render(); });
   }
   function viewMore(v) {
-    var it = [['stats', '📊', '통계', '보험 종류별 · 유입 경로별 · 월별 가입'], ['log', '🗂', '처리 기록', '누가 무엇을 했는지'], ['claim', '☎', '보험사 사고접수', '보험사 번호 · 누르면 전화']];
+    var it = [['stats', '📊', '통계', '보험 종류별 · 유입 경로별 · 월별 가입'], ['rates', '🧮', '보험료 계산', '월보험 · 건당보험 안내 · 금액 수정'], ['log', '🗂', '처리 기록', '누가 무엇을 했는지'], ['claim', '☎', '보험사 사고접수', '보험사 번호 · 누르면 전화']];
     var it2 = [['xd', '⬇', '엑셀 다운로드', '현재 목록을 .xlsx 로 저장'], ['xu', '⬆', '엑셀 업로드', '사번이 같으면 건너뜀'], ['bk', '💾', '백업 · 복원', '가입 현황 + 신청 전체']];
     var row = function (x, red) { return '<div class="mi' + (red ? ' red' : '') + '" data-m="' + x[0] + '"><i>' + x[1] + '</i><div><b>' + x[2] + '</b><span>' + x[3] + '</span></div></div>'; };
     v.innerHTML = mHdr('더보기') + '<div class="mbody"><div class="menu">' + it.map(function (x) { return row(x); }).join('') + '</div><div class="menu">' + it2.map(function (x) { return row(x); }).join('') + '</div><div class="menu">' + row(['da', '🗑', '기사 전체 삭제', '삭제 전 경고창이 나와요'], true) + '</div><div class="menu">' + row(['lo', '⎋', '로그아웃', adminName]) + '</div><input type="file" id="mfile" class="hid" accept=".xlsx,.xls,.csv"><input type="file" id="mrsf" class="hid" accept=".json,application/json"></div>';
     $$('.mi', v).forEach(function (b) { b.addEventListener('click', function () {
       var a = b.getAttribute('data-m');
-      if (a === 'stats' || a === 'log' || a === 'claim') { tab = a; render(); }
+      if (a === 'stats' || a === 'rates' || a === 'log' || a === 'claim') { tab = a; render(); }
       else if (a === 'xd') exportDriversXlsx(drivers.slice().sort(dcmp));
       else if (a === 'xu') $('#mfile', v).click();
       else if (a === 'bk') mBackup();

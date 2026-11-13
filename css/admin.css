@@ -331,3 +331,23 @@ table.dt th.lh{background:#ffefb5;color:#7a5200}table.dt td.lc{padding:4px 2px}
 .pwbox{border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0;border:1px solid;line-height:1.6}
 .pwbox.y{background:#fffbeb;color:#92400e;border-color:#fde68a}.pwbox.r{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
 .depch{display:flex;gap:6px;margin-top:5px}.depch .chip{padding:4px 14px;font-size:12.5px;font-weight:700;border:1px solid #cbd5e1;border-radius:14px;background:#fff;cursor:pointer}
+
+/* v3.1 보험료 계산 */
+.rhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.rpanel .seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;margin-right:10px}.rpanel .seg span{padding:9px 20px;font-weight:700;color:#475569;background:#fff;cursor:pointer}.rpanel .seg span.on{background:#111c3f;color:#facc15}
+.rpanel .lbl{font-size:12px;color:#64748b;font-weight:700;margin:14px 0 6px}
+.rpanel .chip{display:inline-block;border:1px solid #cbd5e1;border-radius:18px;padding:7px 16px;margin:0 6px 6px 0;font-weight:700;color:#475569;background:#fff;cursor:pointer}.rpanel .chip.on{background:#facc15;border-color:#facc15;color:#111}
+.rsel{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.rsel select{padding:9px 12px;border:1px solid #94a3b8;border-radius:10px;font-weight:700;background:#fff;font-size:14px}
+.age{display:inline-block;background:#111c3f;color:#facc15;border-radius:10px;padding:9px 16px;font-weight:800;font-size:15px}
+.wn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;line-height:1.55;margin:12px 0}
+.emp{border:2px dashed #cbd5e1;border-radius:12px;padding:26px;text-align:center;color:#94a3b8;margin-top:14px}
+.rpanel .bx{border:1px solid #e5e7eb;border-radius:12px;padding:14px 18px;line-height:1.9;font-size:14px}.rpanel .bx.hl{border:2px solid #facc15;background:#fffef5}
+.rpanel .g4{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.rpanel .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rpanel .mini{border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.7}.rpanel .mini b{display:block}.rt{color:#2563eb}.pl{background:#fee2e2;color:#b91c1c;border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700}
+.rpanel .cd{border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:12px 0}.rpanel .cd h4{margin:0 0 8px;font-size:16px}
+.rpanel table.sm{border-collapse:collapse;width:100%}.rpanel table.sm th{color:#64748b;font-weight:500;text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12.5px}.rpanel table.sm td{padding:6px 8px;text-align:right;border-top:1px solid #f1f5f9}.rpanel table.sm th:first-child,.rpanel table.sm td:first-child{text-align:left}
+.rpanel .old{color:#94a3b8;text-decoration:line-through}.rpanel .up{background:#fee2e2;color:#b91c1c;border-radius:8px;padding:1px 6px;font-size:11px;margin-left:4px}.rpanel .g{color:#15803d;font-weight:700}
+.ptx{margin-top:10px;font-size:13px;color:#475569;line-height:1.7}.pt.h{font-weight:800;color:#111;margin-top:8px}
+.ri,.rt2,.rta{border:2px solid #3b82f6;background:#eff6ff;border-radius:8px;padding:5px 8px;font-weight:700;color:#1d4ed8;text-align:right;font-size:13px}.rt2{text-align:left}.rta{width:100%;text-align:left;font-weight:500;line-height:1.5;color:#1e3a8a}
+.ea{display:inline-block;background:#f1f5f9;border-radius:8px;padding:5px 9px;color:#64748b}
+@media(max-width:760px){.rpanel .g4,.rpanel .g2{grid-template-columns:1fr}}
