@@ -45,17 +45,34 @@
     drivers.forEach(function (d) { if (d.id !== selfDrv && String(d.phone || '').replace(/[^0-9]/g, '') === dg && !(selfApp && d.application_id === selfApp)) out.push({ t: 'd', o: d }); });
     return out;
   }
+  function dupLabel(x) {
+    if (x.t === 'd') { var st = x.o.status || '가입'; return st === '퇴사' ? '퇴사자' : st === '미납' ? '미납자' : '가입 기사'; }
+    var s2 = x.o.status; return (s2 === 'complete') ? '가입 완료 신청' : s2 === 'canceled' ? '취소 신청' : s2 === 'hold' ? '보류 신청' : '신청 대기';
+  }
+  function dupRed(du, isAppCtx) { return du.some(function (x) { return (x.t === 'd' && (x.o.status || '가입') !== '퇴사') || (x.t === 'a' && isAppCtx && dupLabel(x) === '신청 대기'); }); }
   function phBadge(p, selfApp, selfDrv) {
     var h = '', du = phoneDups(p, selfApp, selfDrv);
     if (phoneSus(p)) h += ' <span class="pwb y" title="연속·반복 숫자 번호예요">⚠ 의심 번호</span>';
-    if (du.length) h += ' <span class="pwb r" title="' + esc(du.map(function (x) { return x.t === 'a' ? (x.o.name + ' · 신청 ' + (x.o.receipt_no || '')) : (x.o.name + ' · 기사 ' + fno(x.o.emp_no)); }).join(' / ')) + '">⚠ 중복 ' + du.length + '건</span>';
+    if (du.length) {
+      var labs = []; du.forEach(function (x) { var l = dupLabel(x); if (labs.indexOf(l) < 0) labs.push(l); });
+      h += ' <span class="pwb ' + (dupRed(du, !selfDrv) ? 'r' : 'y') + '" title="' + esc(du.map(function (x) { return x.t === 'a' ? (x.o.name + ' · 신청 ' + (x.o.receipt_no || '') + ' · ' + dupLabel(x)) : (x.o.name + ' · 기사 ' + fno(x.o.emp_no) + ' · ' + (x.o.status || '가입')); }).join(' / ')) + '">⚠ 중복 ' + du.length + '건 (' + labs.join('·') + ')</span>';
+    }
     return h;
   }
   function phWarnBox(p, selfApp, selfDrv) {
     var du = phoneDups(p, selfApp, selfDrv), h = '';
     if (phoneSus(p)) h += '<div class="pwbox y">⚠ 연속·반복 숫자 번호예요. 실제 연락되는 번호인지 전화로 확인해 보세요.</div>';
-    if (du.length) h += '<div class="pwbox r">⚠ 같은 번호가 ' + du.length + '건 더 있어요 (참고용)<br>' + du.map(function (x) { return x.t === 'a' ? '· <a href="#" class="pwgo" data-a="' + x.o.id + '">' + esc(x.o.name) + ' · 신청 ' + esc(x.o.receipt_no || '') + ' (' + ((ST[x.o.status] || [x.o.status])[0]) + ')</a>' : '· ' + esc(x.o.name) + ' · 기사 ' + fno(x.o.emp_no) + ' (' + esc(x.o.status || '가입') + ')'; }).join('<br>') + '</div>';
+    if (du.length) {
+      var hasOld = du.some(function (x) { return x.t === 'd' && x.o.status === '퇴사'; });
+      h += '<div class="pwbox ' + (dupRed(du, !selfDrv) ? 'r' : 'y') + '">⚠ 같은 번호가 ' + du.length + '건 더 있어요 (참고용)<br>' + du.map(function (x) { return x.t === 'a' ? '· <a href="#" class="pwgo" data-a="' + x.o.id + '">' + esc(x.o.name) + ' · 신청 ' + esc(x.o.receipt_no || '') + ' (' + dupLabel(x) + ')</a>' : '· 기존 기사 ' + esc(x.o.name) + ' · 사번 ' + fno(x.o.emp_no) + ' · ' + esc(x.o.status || '가입'); }).join('<br>') + (hasOld && selfApp ? '<br><span class="mut">퇴사자 재가입이면 「가입 완료」 때 기존 정보가 자동으로 채워져요.</span>' : '') + '</div>';
+    }
     return h;
+  }
+  function oldDriverOf(a) {
+    var dg = String(a.phone || '').replace(/[^0-9]/g, ''); if (!dg) return null;
+    var L = drivers.filter(function (d) { return d.status === '퇴사' && String(d.phone || '').replace(/[^0-9]/g, '') === dg && d.id !== a.driver_id; });
+    L.sort(function (x, y) { return String(y.joined_at || '').localeCompare(String(x.joined_at || '')) || (y.emp_no || 0) - (x.emp_no || 0); });
+    return L[0] || null;
   }
   document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.pwgo'); if (!b) return; e.preventDefault(); openDrawer(b.getAttribute('data-a')); });
   function stTag(s) { var x = ST[s] || [s, '']; return '<span class="tag ' + x[1] + '">' + x[0] + '</span>'; }
@@ -618,6 +635,14 @@
         '<div class="acts"><button class="btn" id="r-ok">등록</button><button class="btn line" id="r-no">취소</button></div></div>';
       m.hidden = false;
       $('#r-ssn').addEventListener('input', function () { var d = this.value.replace(/[^0-9]/g, '').slice(0, 13); this.value = d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; });
+      var od = oldDriverOf(a);
+      if (od) {
+        var setv = function (id, v) { var el = $(id); if (el && v) el.value = v; };
+        setv('#r-ssn', fmtSsn(od.ssn)); setv('#r-co', od.ins_company); setv('#r-dep', od.deposit_group); setv('#r-src', od.source);
+        setv('#r-note', '재가입 (기존 사번 ' + fno(od.emp_no) + ')');
+        var hb = document.createElement('div'); hb.className = 'pwbox y'; hb.innerHTML = '🔁 같은 번호의 퇴사 기사 <b>' + esc(od.name) + ' (사번 ' + fno(od.emp_no) + ')</b> 정보를 불러왔어요. 주민번호·보험 회사·입금 그룹명·유입 경로·비고를 확인한 뒤 등록하세요. (일비·보험 종류 등 이번 조건은 새로 입력)';
+        m.querySelector('.mut').insertAdjacentElement('afterend', hb);
+      }
       money(['#r-dep2', '#r-daily', '#r-real', '#r-chang', '#r-cm', '#r-tot', '#r-mar']);
       var rmar = function () { $('#r-mar').value = n0(calcMargin($('#r-tot').value, $('#r-chang').value, $('#r-real').value, $('#r-cm').value)); };
       $('#r-daily').addEventListener('input', function () { $('#r-tot').value = n0(calcTotal(this.value)); rmar(); });
