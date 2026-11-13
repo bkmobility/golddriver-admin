@@ -199,10 +199,19 @@
     return '<div class="mini"><b>' + t + (rent ? ' <span class="pl">렌터카 포함</span>' : '') + '</b>' + body + '</div>';
   }
   function ptext(t) { return esc(t).split('\n').map(function (l) { return /^\d+\.\s/.test(l) ? '<div class="pt h">' + l + '</div>' : '<div class="pt">' + l.replace(/^ {2}/, '&nbsp;&nbsp;&nbsp;') + '</div>'; }).join(''); }
+  function halfTbl(rows, P) {
+    function side(cls, name, i) {
+      var t = '<table>';
+      rows.forEach(function (r, j) { var Q = P ? P + 'rows.' + j + '.' : ''; t += '<tr><td>' + (P ? rTx(Q + i, r[i], 110) : esc(r[i])) + '</td><td>' + (P ? rEd(Q + (i + 1), r[i + 1], 78) + ' 원' : won(r[i + 1])) + '</td></tr>'; });
+      return '<div class="hb ' + cls + '"><div class="hh">' + name + '</div><div class="eh"><span>연령</span><span>금액' + (P ? ' (원)' : '') + '</span></div>' + t + '</table></div>';
+    }
+    return '<div class="half">' + side('a', '수도권', 0) + side('b', '지방권', 2) + '</div>';
+  }
   function colCard(p) {
-    var h = '<div class="cd"><h4>' + esc(p.title) + '</h4><div class="info" style="margin:0 0 6px">1. ' + esc(p.head) + '</div><table class="sm"><tr><th>' + (p.dual ? '수도권' : '수도권/지방권') + '</th><th></th>' + (p.dual ? '<th>지방권</th><th></th>' : '') + '</tr>';
-    p.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td>' + won(r[1]) + '</td>' + (p.dual ? '<td>' + esc(r[2]) + '</td><td>' + won(r[3]) + '</td>' : '') + '</tr>'; });
-    return h + '</table><div class="ptx">' + ptext(p.text) + '</div></div>';
+    var h = '<div class="cd"><h4>' + esc(p.title) + '</h4><div class="info" style="margin:0 0 6px">1. ' + esc(p.head) + '</div>';
+    if (p.dual) h += halfTbl(p.rows, null);
+    else { h += '<table class="sm"><tr><th>수도권/지방권</th><th></th></tr>'; p.rows.forEach(function (r) { h += '<tr><td>' + esc(r[0]) + '</td><td>' + won(r[1]) + '</td></tr>'; }); h += '</table>'; }
+    return h + '<div class="ptx">' + ptext(p.text) + '</div></div>';
   }
   function logiCard(title, rows, withRent) {
     var h = '<div class="cd"><h4>' + title + '</h4><table class="sm"><tr><th>연령</th><th>기존</th><th>변경</th><th>무사고 경력자 최저</th>' + (withRent ? '<th>렌터카 특약 포함</th>' : '') + '</tr>';
@@ -264,7 +273,7 @@
       } else if (rs.prog) {
         h += '<div class="info" style="margin:8px 0">' + (rs.prog === 'icon' ? '아이콘은 콜마너와 같은 금액·문구를 사용해요. 아래에서 수정하면 콜마너·아이콘 모두 바뀌어요.' : '') + '</div><div class="lbl">보험사 · 종류</div>' + R.col.map(function (p, i) { return '<span class="chip' + (rs.sub === i ? ' on' : '') + '" data-sb="' + i + '">' + esc(p.name) + '</span>'; }).join('');
         var p = R.col[rs.sub] || R.col[0], i2 = R.col.indexOf(p), P = 'col.' + i2 + '.';
-        h += '<div class="cd"><h4>' + rTx(P + 'title', p.title, 360) + '</h4><div class="info">표 제목 ' + rTx(P + 'head', p.head, 200) + '</div><div class="tw"><table class="sm"><tr><th>' + (p.dual ? '수도권' : '수도권/지방권') + '</th><th>금액</th>' + (p.dual ? '<th>지방권</th><th>금액</th>' : '') + '</tr>' + p.rows.map(function (r, j) { var Q = P + 'rows.' + j + '.'; return '<tr><td>' + rTx(Q + '0', r[0], 110) + '</td><td>' + rEd(Q + '1', r[1], 78) + ' 원</td>' + (p.dual ? '<td>' + rTx(Q + '2', r[2], 110) + '</td><td>' + rEd(Q + '3', r[3], 78) + ' 원</td>' : '') + '</tr>'; }).join('') + '</table></div><div class="lbl">하단 안내 문구 (줄바꿈 그대로 표시)</div><textarea class="rta" data-p="' + P + 'text" data-s="1" rows="12">' + esc(p.text) + '</textarea></div>';
+        h += '<div class="cd"><h4>' + rTx(P + 'title', p.title, 360) + '</h4><div class="info">표 제목 ' + rTx(P + 'head', p.head, 200) + '</div>' + (p.dual ? halfTbl(p.rows, P) : '<div class="tw"><table class="sm"><tr><th>수도권/지방권</th><th>금액</th></tr>' + p.rows.map(function (r, j) { var Q = P + 'rows.' + j + '.'; return '<tr><td>' + rTx(Q + '0', r[0], 110) + '</td><td>' + rEd(Q + '1', r[1], 78) + ' 원</td></tr>'; }).join('') + '</table></div>') + '<div class="lbl">하단 안내 문구 (줄바꿈 그대로 표시)</div><textarea class="rta" data-p="' + P + 'text" data-s="1" rows="12">' + esc(p.text) + '</textarea></div>';
       } else h += '<div class="emp" style="margin-top:12px">수정할 프로그램을 선택해 주세요</div>';
     } else {
       h += '<div class="lbl">월보험 안내 문구 (맨 위)</div><textarea class="rta" data-p="msgM" data-s="1" rows="2">' + esc(R.msgM) + '</textarea><div class="lbl">건당보험 안내 문구 (로지 · 콜마너 · 아이콘 공통)</div><textarea class="rta" data-p="msgG" data-s="1" rows="2">' + esc(R.msgG) + '</textarea><div class="lbl">만 26세 미만 등 해당 구간이 없을 때 문구</div><textarea class="rta" data-p="msgNone" data-s="1" rows="2">' + esc(R.msgNone) + '</textarea>';
